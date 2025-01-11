@@ -22,6 +22,10 @@ func Router() *gin.Engine {
 	v1.POST("/login", service.Login)
 	v1.POST("/resetPwd", service.ResetPassword)
 	v1.GET("/getAvatar/:userId", service.GetAvatar)
+	v1.GET("/getUserInfo", service.GetUserInfo)
+	v1.POST("/getUseSpace", service.GetUseSpace)
+	v1.POST("/logout", service.Logout)
+	v1.POST("/updateUserAvatar", service.UpdateUserAvatar)
 
 	return r
 }

@@ -24,7 +24,7 @@ type UserLoginDto struct {
 	UserId   string `gorm:"column:id" json:"userId"`
 	NickName string `gorm:"column:nick_name" json:"nickName"`
 	IsAdmin  bool   `gorm:"column:is_admin" json:"isAdmin"`
-	Avatar   string `gorm:"column:qq_avatar" json:"qqAvatar"`
+	Avatar   string `gorm:"column:qq_avatar" json:"avatar"`
 }
 type UserSpaceDto struct {
 	UseSpace   int `json:"useSpace"`

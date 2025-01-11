@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"io"
 	"os"
 	"strconv"
 	"time"
@@ -160,12 +159,23 @@ func Login(c *gin.Context) {
 	if userInfo.Email == define.ADMIN_EMAIL {
 		userLoginDto.IsAdmin = true
 	}
+	userInfoJson, _ := json.Marshal(&userLoginDto)
+	models.RDb.Set(context.Background(), define.REDIS_USER_INFO+userInfo.UserId, userInfoJson, define.EXPIRE_DAY)
+
+	session := sessions.Default(c)
+	session.Set(define.SESSION_USER_ID, userInfo.UserId)
+	err := session.Save()
+	if err != nil {
+		response.ResponseFailWithData(c, 0, "服务器错误")
+		return
+	}
 
 	var userSpaceDto models.UserSpaceDto
 	userSpaceDto.UseSpace = userInfo.UseSpace
 	userSpaceDto.TotalSpace = userInfo.TotalSpace
+	//todo 查询已使用的空间大小
 	userSpaceJson, _ := json.Marshal(userSpaceDto)
-	models.RDb.Set(context.Background(), define.USER_SPACE+userInfo.UserId, userSpaceJson, define.EXPIRE_DAY)
+	models.RDb.Set(context.Background(), define.REDIS_USER_SPACE+userInfo.UserId, userSpaceJson, define.EXPIRE_DAY)
 
 	response.ResponseOKWithData(c, userLoginDto)
 	return
@@ -215,36 +225,87 @@ func GetAvatar(c *gin.Context) {
 	var file *os.File
 	var err error
 	if !exists {
-		fmt.Println("不存在")
+		//如果minio中不存在，则获取默认头像，需要提前将默认头像上传至minio
 		file, err = minIO.DownloadImage(define.DEFAULT_AVATAR_NAME)
 		if err != nil {
 			response.ResponseFailWithData(c, 0, "获取头像失败")
 		}
 	} else {
-		fmt.Println("存在")
 		file, err = minIO.DownloadImage(userId + ".jpg")
 		if err != nil {
 			response.ResponseFailWithData(c, 0, "获取头像失败")
 		}
 	}
-	data, err := FileToBytes(file)
+	data, err := helper.FileToBytes(file)
 	if err != nil {
 		response.ResponseFailWithData(c, 0, "获取头像失败")
 	}
 	c.Data(200, "image/jpg", data)
 	return
 }
-func FileToBytes(file *os.File) ([]byte, error) {
-	// 将文件指针移动到文件的开头
-	_, err := file.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
 
-	// 读取整个文件内容
-	data, err := io.ReadAll(file)
+func GetUserInfo(c *gin.Context) {
+	session := sessions.Default(c)
+	userId := session.Get(define.SESSION_USER_ID).(string)
+	var userLoginDto models.UserLoginDto
+	result, _ := models.RDb.Get(context.Background(), define.REDIS_USER_INFO+userId).Result()
+	json.Unmarshal([]byte(result), &userLoginDto)
+	response.ResponseOKWithData(c, userLoginDto)
+	return
+
+}
+
+func GetUseSpace(c *gin.Context) {
+	//session := sessions.Default(c)
+	//userInfo := session.Get(define.USER_INFO).([]byte)
+	//var userLoginDto models.UserLoginDto
+	//json.Unmarshal(userInfo, &userLoginDto)
+	session := sessions.Default(c)
+	userId := session.Get(define.SESSION_USER_ID).(string)
+	response.ResponseOKWithData(c, getUserUseSpace(userId))
+	return
+}
+
+func getUserUseSpace(userId string) models.UserSpaceDto {
+	result, _ := models.RDb.Get(context.Background(), define.REDIS_USER_SPACE+userId).Result()
+	var userSpaceDto models.UserSpaceDto
+	json.Unmarshal([]byte(result), &userSpaceDto)
+	//todo 查询已使用的空间大小
+	fmt.Println(define.REDIS_USER_SPACE + userId)
+	fmt.Println(userSpaceDto)
+	return userSpaceDto
+}
+
+func Logout(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Clear()
+	err := session.Save()
 	if err != nil {
-		return nil, err
+		response.ResponseFailWithData(c, 0, "服务器错误")
+		return
 	}
-	return data, nil
+	response.ResponseOK(c)
+	return
+}
+
+func UpdateUserAvatar(c *gin.Context) {
+	session := sessions.Default(c)
+	userId := session.Get(define.SESSION_USER_ID).(string)
+	avatar, _ := c.FormFile("avatar")
+	file, _ := avatar.Open()
+	finalFile, _ := helper.SaveMultipartFile(file)
+	minIO.UploadUserAvatar(avatar.Filename, userId, finalFile)
+	go func() {
+		models.Db.Model(new(models.User)).Where("id = ?", userId).Update("qq_avatar", "")
+	}()
+	go func() {
+		var userLoginDto models.UserLoginDto
+		result, _ := models.RDb.Get(context.Background(), define.REDIS_USER_INFO+userId).Result()
+		json.Unmarshal([]byte(result), &userLoginDto)
+		userLoginDto.Avatar = ""
+		userInfoJson, _ := json.Marshal(&userLoginDto)
+		models.RDb.Set(context.Background(), define.REDIS_USER_INFO+userId, userInfoJson, define.EXPIRE_DAY)
+	}()
+	response.ResponseOK(c)
+	return
 }

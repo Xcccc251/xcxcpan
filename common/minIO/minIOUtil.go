@@ -41,15 +41,14 @@ func InitMinioClient() *minio.Client {
 //		log.Printf("Successfully uploaded %s of size %d\n", objectName, uploadInfo.Size)
 //		return "http://127.0.0.1:9001/xcxcaudio/" + objectName, nil
 //	}
-//
-//	func DelObject(fileName string) error {
-//		err := minioClient.RemoveObject(context.Background(), bucketName, fileName, minio.RemoveObjectOptions{})
-//		if err != nil {
-//			log.Fatalln(err)
-//			return err
-//		}
-//		return nil
-//	}
+func DelImage(fileName string) error {
+	err := minioClient.RemoveObject(context.Background(), define.Image_bucketName, fileName, minio.RemoveObjectOptions{})
+	if err != nil {
+		log.Fatalln(err)
+		return err
+	}
+	return nil
+}
 func UploadImage(fileName string, file *os.File) (finalUrl string, err error) {
 	ext := path.Ext(fileName)
 	fileInfo, err := file.Stat()
@@ -67,6 +66,30 @@ func UploadImage(fileName string, file *os.File) (finalUrl string, err error) {
 	return "http://127.0.0.1:9001/xcxcpanimage/" + objectName, nil
 }
 
+func UploadUserAvatar(fileName string, userId string, file *os.File) (finalUrl string, err error) {
+	exists := CheckAvatarExists(userId + ".jpg")
+	if exists {
+		DelImage(userId + ".jpg")
+	}
+
+	ext := path.Ext(fileName)
+	if ext != ".jpg" && ext != ".png" && ext != ".jpeg" {
+		return "", err
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	objectName := userId + ".jpg"
+	contentType := "image/jpg"
+	uploadInfo, err := minioClient.PutObject(context.Background(), define.Image_bucketName, objectName, file, fileInfo.Size(),
+		minio.PutObjectOptions{ContentType: contentType})
+	if err != nil {
+		return "", err
+	}
+	log.Printf("Successfully uploaded %s of size %d\n", objectName, uploadInfo.Size)
+	return "http://127.0.0.1:9001/xcxcpanimage/" + objectName, nil
+}
 func DownloadImage(fileName string) (file *os.File, err error) {
 	object, err := minioClient.GetObject(context.Background(), define.Image_bucketName, fileName, minio.GetObjectOptions{})
 	if err != nil {
