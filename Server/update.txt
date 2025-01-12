@@ -1,0 +1,1 @@
+goctl rpc protoc FileServer.proto --go_out=./XcXcPanFileServer  --go-grpc_out=./XcXcPanFileServer   --zrpc_out=./XcXcPanFileServer

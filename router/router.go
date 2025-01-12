@@ -10,7 +10,7 @@ import (
 
 func Router() *gin.Engine {
 	r := gin.Default()
-	// 初始化基于 Cookie 的存储引擎
+	// 初始化 Cookie 的存储引擎
 	store := cookie.NewStore([]byte("xcxcpan_secret")) //session加密密钥
 	r.Use(sessions.Sessions("xcxcpan_session", store))
 	r.Use(middlewares.CorsMiddleWare()) //跨域
@@ -26,6 +26,11 @@ func Router() *gin.Engine {
 	v1.POST("/getUseSpace", middlewares.AuthUserCheck(), service.GetUseSpace)
 	v1.POST("/logout", middlewares.AuthUserCheck(), service.Logout)
 	v1.POST("/updateUserAvatar", middlewares.AuthUserCheck(), service.UpdateUserAvatar)
+	v1.POST("/qqlogin", service.QQLogin)
+	file := v1.Group("/file")
+	{
+		file.POST("/loadDataList", middlewares.AuthUserCheck(), service.GetFileList)
+	}
 
 	return r
 }

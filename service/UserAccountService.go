@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -316,4 +318,15 @@ func UpdateUserAvatar(c *gin.Context) {
 	}()
 	response.ResponseOK(c)
 	return
+}
+
+func QQLogin(c *gin.Context) {
+	params := url.Values{}
+	params.Add("response_type", "code")
+	params.Add("client_id", define.AppId)
+	params.Add("state", helper.GetRandomStr(20))
+	str := fmt.Sprintf("%s&redirect_uri=%s", params.Encode(), define.QQ_LOGIN_CALLBACK_URL)
+	loginURL := fmt.Sprintf("%s?%s", "https://graph.qq.com/oauth2.0/authorize", str)
+	c.Redirect(http.StatusFound, loginURL)
+
 }
