@@ -132,6 +132,12 @@ func Login(c *gin.Context) {
 	var count int64
 	email := c.PostForm("email")
 	password := c.PostForm("password")
+	checkCode := c.PostForm("checkCode")
+	session := sessions.Default(c)
+	if checkCode == "" || checkCode != session.Get(define.CHECK_CODE_KEY).(string) {
+		response.ResponseFailWithData(c, 0, "图片验证码错误")
+		return
+	}
 	if email == "" || password == "" {
 		response.ResponseFailWithData(c, 0, "参数错误")
 		return
@@ -162,7 +168,6 @@ func Login(c *gin.Context) {
 	userInfoJson, _ := json.Marshal(&userLoginDto)
 	models.RDb.Set(context.Background(), define.REDIS_USER_INFO+userInfo.UserId, userInfoJson, define.EXPIRE_DAY)
 
-	session := sessions.Default(c)
 	session.Set(define.SESSION_USER_ID, userInfo.UserId)
 	err := session.Save()
 	if err != nil {
@@ -278,12 +283,15 @@ func getUserUseSpace(userId string) models.UserSpaceDto {
 
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	userId, _ := c.Get("userId")
 	session.Clear()
 	err := session.Save()
 	if err != nil {
 		response.ResponseFailWithData(c, 0, "服务器错误")
 		return
 	}
+	models.RDb.Del(context.Background(), define.REDIS_USER_INFO+userId.(string))
+	models.RDb.Del(context.Background(), define.REDIS_USER_SPACE+userId.(string))
 	response.ResponseOK(c)
 	return
 }

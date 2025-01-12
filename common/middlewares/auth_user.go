@@ -1,48 +1,30 @@
 package middlewares
 
-//
-//import (
-//	"XcxcVideo/common/define"
-//	"XcxcVideo/common/helper"
-//	"XcxcVideo/common/models"
-//	"context"
-//	"encoding/json"
-//	"fmt"
-//	"github.com/gin-gonic/gin"
-//	"strconv"
-//	"strings"
-//)
-//
-//func AuthUserCheck() gin.HandlerFunc {
-//	return func(c *gin.Context) {
-//		auth := c.GetHeader("authorization")
-//		token := strings.TrimPrefix(auth, "Bearer ")
-//		if token == "" {
-//			fmt.Println("token is null")
-//			c.Abort()
-//			c.JSON(401, gin.H{"code": 401, "msg": "请先登录"})
-//			return
-//		}
-//		userClaim, _ := helper.AnalysisToken(token)
-//		userId := userClaim.UserId
-//		userIdStr := strconv.Itoa(userId)
-//
-//		userResult, err := models.RDb.Get(context.Background(), define.USER_PREFIX+userIdStr).Result()
-//		if err != nil {
-//			fmt.Println("redis get user error:", err)
-//			c.Abort()
-//			c.JSON(401, gin.H{"code": 401, "msg": "请先登录"})
-//			return
-//		}
-//
-//		// 刷新过期时间
-//		models.RDb.Expire(context.Background(), define.TOKEN_PREFIX+userIdStr, define.TOKEN_TTL)
-//		models.RDb.Expire(context.Background(), define.USER_PREFIX+userIdStr, define.TOKEN_TTL)
-//		var user models.UserVo
-//		json.Unmarshal([]byte(userResult), &user)
-//
-//		c.Set("userId", userId)
-//		c.Set("user", user)
-//		c.Next()
-//	}
-//}
+import (
+	"XcxcPan/common/define"
+	"XcxcPan/common/models"
+	"context"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+)
+
+func AuthUserCheck() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userId := session.Get(define.SESSION_USER_ID)
+		if userId == nil {
+			c.JSON(901, gin.H{
+				"code": 901,
+				"info": "用户未登录",
+			})
+			c.Abort()
+			return
+		}
+
+		models.RDb.Expire(context.Background(), define.REDIS_USER_INFO+userId.(string), define.EXPIRE_DAY)
+		models.RDb.Expire(context.Background(), define.REDIS_USER_SPACE+userId.(string), define.EXPIRE_DAY)
+
+		c.Set("userId", userId.(string))
+		c.Next()
+	}
+}
