@@ -14,17 +14,20 @@ import (
 )
 
 type (
-	DelChunkRequest     = XcXcPanFileServer.DelChunkRequest
-	DelChunkResponse    = XcXcPanFileServer.DelChunkResponse
-	SayHelloRequest     = XcXcPanFileServer.SayHelloRequest
-	SayHelloResponse    = XcXcPanFileServer.SayHelloResponse
-	UploadChunkRequest  = XcXcPanFileServer.UploadChunkRequest
-	UploadChunkResponse = XcXcPanFileServer.UploadChunkResponse
+	DelChunkRequest       = XcXcPanFileServer.DelChunkRequest
+	DelChunkResponse      = XcXcPanFileServer.DelChunkResponse
+	DownloadChunkRequest  = XcXcPanFileServer.DownloadChunkRequest
+	DownloadChunkResponse = XcXcPanFileServer.DownloadChunkResponse
+	SayHelloRequest       = XcXcPanFileServer.SayHelloRequest
+	SayHelloResponse      = XcXcPanFileServer.SayHelloResponse
+	UploadChunkRequest    = XcXcPanFileServer.UploadChunkRequest
+	UploadChunkResponse   = XcXcPanFileServer.UploadChunkResponse
 
 	XcXcPanFileService interface {
 		SayHello(ctx context.Context, in *SayHelloRequest, opts ...grpc.CallOption) (*SayHelloResponse, error)
 		UploadChunk(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*UploadChunkResponse, error)
 		DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error)
+		DownloadChunk(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*DownloadChunkResponse, error)
 	}
 
 	defaultXcXcPanFileService struct {
@@ -51,4 +54,9 @@ func (m *defaultXcXcPanFileService) UploadChunk(ctx context.Context, in *UploadC
 func (m *defaultXcXcPanFileService) DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error) {
 	client := XcXcPanFileServer.NewXcXcPanFileServiceClient(m.cli.Conn())
 	return client.DelChunk(ctx, in, opts...)
+}
+
+func (m *defaultXcXcPanFileService) DownloadChunk(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*DownloadChunkResponse, error) {
+	client := XcXcPanFileServer.NewXcXcPanFileServiceClient(m.cli.Conn())
+	return client.DownloadChunk(ctx, in, opts...)
 }

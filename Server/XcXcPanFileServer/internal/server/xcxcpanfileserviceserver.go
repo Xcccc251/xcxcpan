@@ -37,3 +37,8 @@ func (s *XcXcPanFileServiceServer) DelChunk(ctx context.Context, in *XcXcPanFile
 	l := logic.NewDelChunkLogic(ctx, s.svcCtx)
 	return l.DelChunk(in)
 }
+
+func (s *XcXcPanFileServiceServer) DownloadChunk(ctx context.Context, in *XcXcPanFileServer.DownloadChunkRequest) (*XcXcPanFileServer.DownloadChunkResponse, error) {
+	l := logic.NewDownloadChunkLogic(ctx, s.svcCtx)
+	return l.DownloadChunk(in)
+}

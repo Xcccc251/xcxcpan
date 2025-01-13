@@ -57,7 +57,7 @@ func UploadFile(c *gin.Context) {
 	//ext := path.Ext(fileName)
 	fileMd5 := c.PostForm("fileMd5")
 	chunkIndex, _ := strconv.Atoi(c.PostForm("chunkIndex"))
-	//chunks, _ := strconv.Atoi(c.PostForm("chunks"))
+	chunks, _ := strconv.Atoi(c.PostForm("chunks"))
 	fileId := c.PostForm("fileId")
 	filePid := c.PostForm("filePid")
 	userId, _ := c.Get("userId")
@@ -94,41 +94,49 @@ func UploadFile(c *gin.Context) {
 			updateUserUseSpace(userUseSpace, dbFile.FileSize, userId.(string))
 			response.ResponseOKWithData(c, uploadResultDto)
 		}
-		//正常传递切片
-		//判断磁盘空间
-		tempSize := getTempFileSize(fileId, userId.(string))
-		if tempSize+int(file.Size) > userUseSpace.TotalSpace {
-			delFileChunks(fileId, userId.(string))
-			response.ResponseFailWithData(c, 904, "上传失败,空间不足")
-			return
-		}
-		chunk_id := userId.(string) + "_" + fileId + "_" + strconv.Itoa(chunkIndex)
-		server_id := define.GetServerId(hashRing.Hash.Get(chunk_id))
-		err := uploadChunk(chunk_id, server_id, file)
-		if err != nil {
-			delFileChunks(fileId, userId.(string))
-			fmt.Println(err)
-			response.ResponseFailWithData(c, 0, "上传失败")
-			return
-		}
-		go func() {
-			//todo kafka
-			//异步存数据库
-			var chunk models.Chunk
-			chunk.FileId = fileId
-			chunk.ChunkId = chunk_id
-			chunk.ServerId = server_id
-			models.Db.Model(new(models.Chunk)).Create(&chunk)
-			//redis index server键值对
-			redisUtil.SetHash(define.REDIS_CHUNK+userId.(string)+":"+fileId, chunkIndex, server_id)
 
-		}()
-		saveTempFileSize(fileId, int(file.Size), userId.(string))
-		uploadResultDto.FileId = fileId
-		uploadResultDto.Status = define.UPLOADING
-		response.ResponseOKWithData(c, uploadResultDto)
+	}
+	//正常传递切片
+	//判断磁盘空间
+	tempSize := getTempFileSize(fileId, userId.(string))
+	if userUseSpace.UseSpace+tempSize+int(file.Size) > userUseSpace.TotalSpace {
+		delFileChunks(fileId, userId.(string))
+		response.ResponseFailWithData(c, 904, "上传失败,空间不足")
 		return
 	}
+	chunk_id := userId.(string) + "_" + fileId + "_" + strconv.Itoa(chunkIndex)
+	server_id := define.GetServerId(hashRing.Hash.Get(chunk_id))
+	err := uploadChunk(chunk_id, server_id, file)
+	if err != nil {
+		delFileChunks(fileId, userId.(string))
+		fmt.Println(err)
+		response.ResponseFailWithData(c, 0, "上传失败")
+		return
+	}
+	go func() {
+		//todo kafka
+		//异步存数据库
+		var chunk models.Chunk
+		chunk.FileId = fileId
+		chunk.ChunkId = chunk_id
+		chunk.ServerId = server_id
+		models.Db.Model(new(models.Chunk)).Create(&chunk)
+		//redis index server键值对
+		redisUtil.SetHash(define.REDIS_CHUNK+userId.(string)+":"+fileId, chunkIndex, server_id)
+
+	}()
+	saveTempFileSize(fileId, int(file.Size), userId.(string))
+	uploadResultDto.FileId = fileId
+	uploadResultDto.Status = define.UPLOADING
+	if chunkIndex == chunks-1 {
+		uploadResultDto.Status = define.UPLOAD_FINISH
+		response.ResponseOKWithData(c, uploadResultDto)
+		return
+
+	}
+
+	response.ResponseOKWithData(c, uploadResultDto)
+	return
 
 }
 

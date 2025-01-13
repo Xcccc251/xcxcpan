@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	XcXcPanFileService_SayHello_FullMethodName    = "/XcXcPanFileServer.XcXcPanFileService/SayHello"
-	XcXcPanFileService_UploadChunk_FullMethodName = "/XcXcPanFileServer.XcXcPanFileService/UploadChunk"
-	XcXcPanFileService_DelChunk_FullMethodName    = "/XcXcPanFileServer.XcXcPanFileService/DelChunk"
+	XcXcPanFileService_SayHello_FullMethodName      = "/XcXcPanFileServer.XcXcPanFileService/SayHello"
+	XcXcPanFileService_UploadChunk_FullMethodName   = "/XcXcPanFileServer.XcXcPanFileService/UploadChunk"
+	XcXcPanFileService_DelChunk_FullMethodName      = "/XcXcPanFileServer.XcXcPanFileService/DelChunk"
+	XcXcPanFileService_DownloadChunk_FullMethodName = "/XcXcPanFileServer.XcXcPanFileService/DownloadChunk"
 )
 
 // XcXcPanFileServiceClient is the client API for XcXcPanFileService service.
@@ -31,6 +32,7 @@ type XcXcPanFileServiceClient interface {
 	SayHello(ctx context.Context, in *SayHelloRequest, opts ...grpc.CallOption) (*SayHelloResponse, error)
 	UploadChunk(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*UploadChunkResponse, error)
 	DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error)
+	DownloadChunk(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*DownloadChunkResponse, error)
 }
 
 type xcXcPanFileServiceClient struct {
@@ -71,6 +73,16 @@ func (c *xcXcPanFileServiceClient) DelChunk(ctx context.Context, in *DelChunkReq
 	return out, nil
 }
 
+func (c *xcXcPanFileServiceClient) DownloadChunk(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*DownloadChunkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DownloadChunkResponse)
+	err := c.cc.Invoke(ctx, XcXcPanFileService_DownloadChunk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // XcXcPanFileServiceServer is the server API for XcXcPanFileService service.
 // All implementations must embed UnimplementedXcXcPanFileServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type XcXcPanFileServiceServer interface {
 	SayHello(context.Context, *SayHelloRequest) (*SayHelloResponse, error)
 	UploadChunk(context.Context, *UploadChunkRequest) (*UploadChunkResponse, error)
 	DelChunk(context.Context, *DelChunkRequest) (*DelChunkResponse, error)
+	DownloadChunk(context.Context, *DownloadChunkRequest) (*DownloadChunkResponse, error)
 	mustEmbedUnimplementedXcXcPanFileServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedXcXcPanFileServiceServer) UploadChunk(context.Context, *Uploa
 }
 func (UnimplementedXcXcPanFileServiceServer) DelChunk(context.Context, *DelChunkRequest) (*DelChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DelChunk not implemented")
+}
+func (UnimplementedXcXcPanFileServiceServer) DownloadChunk(context.Context, *DownloadChunkRequest) (*DownloadChunkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadChunk not implemented")
 }
 func (UnimplementedXcXcPanFileServiceServer) mustEmbedUnimplementedXcXcPanFileServiceServer() {}
 func (UnimplementedXcXcPanFileServiceServer) testEmbeddedByValue()                            {}
@@ -172,6 +188,24 @@ func _XcXcPanFileService_DelChunk_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _XcXcPanFileService_DownloadChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DownloadChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XcXcPanFileServiceServer).DownloadChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XcXcPanFileService_DownloadChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XcXcPanFileServiceServer).DownloadChunk(ctx, req.(*DownloadChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // XcXcPanFileService_ServiceDesc is the grpc.ServiceDesc for XcXcPanFileService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var XcXcPanFileService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DelChunk",
 			Handler:    _XcXcPanFileService_DelChunk_Handler,
+		},
+		{
+			MethodName: "DownloadChunk",
+			Handler:    _XcXcPanFileService_DownloadChunk_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

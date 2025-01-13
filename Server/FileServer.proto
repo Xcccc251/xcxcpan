@@ -7,6 +7,7 @@ service XcXcPanFileService {
   rpc SayHello(SayHelloRequest) returns (SayHelloResponse);
   rpc UploadChunk(UploadChunkRequest) returns (UploadChunkResponse);
   rpc DelChunk(DelChunkRequest) returns (DelChunkResponse);
+  rpc DownloadChunk(DownloadChunkRequest) returns (DownloadChunkResponse);
 }
 
 message SayHelloRequest {
@@ -15,6 +16,15 @@ message SayHelloRequest {
 
 message SayHelloResponse {
   string message = 1;
+}
+
+message DownloadChunkRequest{
+  string fileName = 1;
+  int64 server = 2;
+}
+
+message DownloadChunkResponse {
+  bytes data = 1;
 }
 
 message DelChunkRequest {
