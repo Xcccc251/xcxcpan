@@ -1,5 +1,7 @@
 Name: fileserver1.rpc
 ListenOn: 127.0.0.1:8001
+MaxRecvMsgSize: 15000000
+MaxSendMsgSize: 15000000
 Etcd:
   Hosts:
   - 127.0.0.1:2379

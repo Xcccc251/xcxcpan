@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	XcXcPanFileService_SayHello_FullMethodName   = "/XcXcPanFileServer.XcXcPanFileService/SayHello"
-	XcXcPanFileService_UploadFile_FullMethodName = "/XcXcPanFileServer.XcXcPanFileService/UploadFile"
+	XcXcPanFileService_SayHello_FullMethodName    = "/XcXcPanFileServer.XcXcPanFileService/SayHello"
+	XcXcPanFileService_UploadChunk_FullMethodName = "/XcXcPanFileServer.XcXcPanFileService/UploadChunk"
+	XcXcPanFileService_DelChunk_FullMethodName    = "/XcXcPanFileServer.XcXcPanFileService/DelChunk"
 )
 
 // XcXcPanFileServiceClient is the client API for XcXcPanFileService service.
@@ -28,7 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type XcXcPanFileServiceClient interface {
 	SayHello(ctx context.Context, in *SayHelloRequest, opts ...grpc.CallOption) (*SayHelloResponse, error)
-	UploadFile(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*UploadFileResponse, error)
+	UploadChunk(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*UploadChunkResponse, error)
+	DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error)
 }
 
 type xcXcPanFileServiceClient struct {
@@ -49,10 +51,20 @@ func (c *xcXcPanFileServiceClient) SayHello(ctx context.Context, in *SayHelloReq
 	return out, nil
 }
 
-func (c *xcXcPanFileServiceClient) UploadFile(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*UploadFileResponse, error) {
+func (c *xcXcPanFileServiceClient) UploadChunk(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*UploadChunkResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UploadFileResponse)
-	err := c.cc.Invoke(ctx, XcXcPanFileService_UploadFile_FullMethodName, in, out, cOpts...)
+	out := new(UploadChunkResponse)
+	err := c.cc.Invoke(ctx, XcXcPanFileService_UploadChunk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *xcXcPanFileServiceClient) DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DelChunkResponse)
+	err := c.cc.Invoke(ctx, XcXcPanFileService_DelChunk_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +76,8 @@ func (c *xcXcPanFileServiceClient) UploadFile(ctx context.Context, in *UploadFil
 // for forward compatibility.
 type XcXcPanFileServiceServer interface {
 	SayHello(context.Context, *SayHelloRequest) (*SayHelloResponse, error)
-	UploadFile(context.Context, *UploadFileRequest) (*UploadFileResponse, error)
+	UploadChunk(context.Context, *UploadChunkRequest) (*UploadChunkResponse, error)
+	DelChunk(context.Context, *DelChunkRequest) (*DelChunkResponse, error)
 	mustEmbedUnimplementedXcXcPanFileServiceServer()
 }
 
@@ -78,8 +91,11 @@ type UnimplementedXcXcPanFileServiceServer struct{}
 func (UnimplementedXcXcPanFileServiceServer) SayHello(context.Context, *SayHelloRequest) (*SayHelloResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SayHello not implemented")
 }
-func (UnimplementedXcXcPanFileServiceServer) UploadFile(context.Context, *UploadFileRequest) (*UploadFileResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UploadFile not implemented")
+func (UnimplementedXcXcPanFileServiceServer) UploadChunk(context.Context, *UploadChunkRequest) (*UploadChunkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadChunk not implemented")
+}
+func (UnimplementedXcXcPanFileServiceServer) DelChunk(context.Context, *DelChunkRequest) (*DelChunkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DelChunk not implemented")
 }
 func (UnimplementedXcXcPanFileServiceServer) mustEmbedUnimplementedXcXcPanFileServiceServer() {}
 func (UnimplementedXcXcPanFileServiceServer) testEmbeddedByValue()                            {}
@@ -120,20 +136,38 @@ func _XcXcPanFileService_SayHello_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XcXcPanFileService_UploadFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UploadFileRequest)
+func _XcXcPanFileService_UploadChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadChunkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XcXcPanFileServiceServer).UploadFile(ctx, in)
+		return srv.(XcXcPanFileServiceServer).UploadChunk(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XcXcPanFileService_UploadFile_FullMethodName,
+		FullMethod: XcXcPanFileService_UploadChunk_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XcXcPanFileServiceServer).UploadFile(ctx, req.(*UploadFileRequest))
+		return srv.(XcXcPanFileServiceServer).UploadChunk(ctx, req.(*UploadChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _XcXcPanFileService_DelChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DelChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XcXcPanFileServiceServer).DelChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XcXcPanFileService_DelChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XcXcPanFileServiceServer).DelChunk(ctx, req.(*DelChunkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -150,8 +184,12 @@ var XcXcPanFileService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _XcXcPanFileService_SayHello_Handler,
 		},
 		{
-			MethodName: "UploadFile",
-			Handler:    _XcXcPanFileService_UploadFile_Handler,
+			MethodName: "UploadChunk",
+			Handler:    _XcXcPanFileService_UploadChunk_Handler,
+		},
+		{
+			MethodName: "DelChunk",
+			Handler:    _XcXcPanFileService_DelChunk_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

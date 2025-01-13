@@ -28,7 +28,12 @@ func (s *XcXcPanFileServiceServer) SayHello(ctx context.Context, in *XcXcPanFile
 	return l.SayHello(in)
 }
 
-func (s *XcXcPanFileServiceServer) UploadFile(ctx context.Context, in *XcXcPanFileServer.UploadFileRequest) (*XcXcPanFileServer.UploadFileResponse, error) {
-	l := logic.NewUploadFileLogic(ctx, s.svcCtx)
-	return l.UploadFile(in)
+func (s *XcXcPanFileServiceServer) UploadChunk(ctx context.Context, in *XcXcPanFileServer.UploadChunkRequest) (*XcXcPanFileServer.UploadChunkResponse, error) {
+	l := logic.NewUploadChunkLogic(ctx, s.svcCtx)
+	return l.UploadChunk(in)
+}
+
+func (s *XcXcPanFileServiceServer) DelChunk(ctx context.Context, in *XcXcPanFileServer.DelChunkRequest) (*XcXcPanFileServer.DelChunkResponse, error) {
+	l := logic.NewDelChunkLogic(ctx, s.svcCtx)
+	return l.DelChunk(in)
 }

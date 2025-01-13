@@ -14,14 +14,17 @@ import (
 )
 
 type (
-	SayHelloRequest    = XcXcPanFileServer.SayHelloRequest
-	SayHelloResponse   = XcXcPanFileServer.SayHelloResponse
-	UploadFileRequest  = XcXcPanFileServer.UploadFileRequest
-	UploadFileResponse = XcXcPanFileServer.UploadFileResponse
+	DelChunkRequest     = XcXcPanFileServer.DelChunkRequest
+	DelChunkResponse    = XcXcPanFileServer.DelChunkResponse
+	SayHelloRequest     = XcXcPanFileServer.SayHelloRequest
+	SayHelloResponse    = XcXcPanFileServer.SayHelloResponse
+	UploadChunkRequest  = XcXcPanFileServer.UploadChunkRequest
+	UploadChunkResponse = XcXcPanFileServer.UploadChunkResponse
 
 	XcXcPanFileService interface {
 		SayHello(ctx context.Context, in *SayHelloRequest, opts ...grpc.CallOption) (*SayHelloResponse, error)
-		UploadFile(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*UploadFileResponse, error)
+		UploadChunk(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*UploadChunkResponse, error)
+		DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error)
 	}
 
 	defaultXcXcPanFileService struct {
@@ -40,7 +43,12 @@ func (m *defaultXcXcPanFileService) SayHello(ctx context.Context, in *SayHelloRe
 	return client.SayHello(ctx, in, opts...)
 }
 
-func (m *defaultXcXcPanFileService) UploadFile(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*UploadFileResponse, error) {
+func (m *defaultXcXcPanFileService) UploadChunk(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*UploadChunkResponse, error) {
 	client := XcXcPanFileServer.NewXcXcPanFileServiceClient(m.cli.Conn())
-	return client.UploadFile(ctx, in, opts...)
+	return client.UploadChunk(ctx, in, opts...)
+}
+
+func (m *defaultXcXcPanFileService) DelChunk(ctx context.Context, in *DelChunkRequest, opts ...grpc.CallOption) (*DelChunkResponse, error) {
+	client := XcXcPanFileServer.NewXcXcPanFileServiceClient(m.cli.Conn())
+	return client.DelChunk(ctx, in, opts...)
 }

@@ -30,6 +30,7 @@ func Router() *gin.Engine {
 	file := v1.Group("/file")
 	{
 		file.POST("/loadDataList", middlewares.AuthUserCheck(), service.GetFileList)
+		file.POST("/uploadFile", middlewares.AuthUserCheck(), service.UploadFile)
 	}
 
 	return r

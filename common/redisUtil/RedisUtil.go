@@ -4,6 +4,7 @@ import (
 	"XcxcPan/common/models"
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 )
 
@@ -33,4 +34,33 @@ func SetAdd(key string, value any) {
 }
 func GetSet(key string) []string {
 	return models.RDb.SMembers(context.Background(), key).Val()
+}
+
+func SetHash(key string, field int, value int) {
+	fieldStr := strconv.Itoa(field)
+	valueStr := strconv.Itoa(value)
+	models.RDb.HSet(context.Background(), key, fieldStr, valueStr)
+}
+
+func GetHashInt(key string) map[int]int {
+	hash, _ := models.RDb.HGetAll(context.Background(), key).Result()
+	// 转换为 map[int]int
+	intMap := make(map[int]int)
+	for k, v := range hash {
+		// 将 key 转换为 int
+		intKey, err := strconv.Atoi(k)
+		if err != nil {
+			continue
+		}
+
+		// 将 value 转换为 int
+		intValue, err := strconv.Atoi(v)
+		if err != nil {
+			continue
+		}
+
+		// 存入 map[int]int
+		intMap[intKey] = intValue
+	}
+	return intMap
 }

@@ -1,0 +1,5 @@
+package define
+
+var FILE_TRANSFER = 0
+var FILE_TRANSFER_FAIL = 1
+var FILE_TRANSFER_SUCCESS = 2

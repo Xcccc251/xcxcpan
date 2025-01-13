@@ -5,7 +5,8 @@ option go_package = "/XcXcPanFileServer";
 
 service XcXcPanFileService {
   rpc SayHello(SayHelloRequest) returns (SayHelloResponse);
-  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse);
+  rpc UploadChunk(UploadChunkRequest) returns (UploadChunkResponse);
+  rpc DelChunk(DelChunkRequest) returns (DelChunkResponse);
 }
 
 message SayHelloRequest {
@@ -16,10 +17,20 @@ message SayHelloResponse {
   string message = 1;
 }
 
-message UploadFileRequest {
+message DelChunkRequest {
+  string fileName = 1;
+  int64 server = 2;
+}
+
+message DelChunkResponse {
+  string message = 1;
+}
+
+message UploadChunkRequest {
   string fileName = 1;
   bytes data = 2;
+  int64 server = 3;
 }
-message UploadFileResponse {
+message UploadChunkResponse {
   string message = 1;
 }

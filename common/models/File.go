@@ -11,7 +11,7 @@ type File struct {
 	UserId         string `gorm:"column:user_id" json:"userId"`
 	FileMd5        string `gorm:"column:file_md5" json:"fileMd5"`
 	FilePid        string `gorm:"column:file_pid" json:"filePid"`
-	FileSize       int64  `gorm:"column:file_size" json:"fileSize"`
+	FileSize       int    `gorm:"column:file_size" json:"fileSize"`
 	FileName       string `gorm:"column:file_name" json:"fileName"`
 	FileCover      string `gorm:"column:file_cover" json:"fileCover"`
 	FilePath       string `gorm:"column:file_path" json:"filePath"`
@@ -45,7 +45,7 @@ type FileVo struct {
 
 type UploadResultDto struct {
 	FileId string `json:"fileId"`
-	Status int    `json:"status"`
+	Status string `json:"status"`
 }
 
 func (File) TableName() string {

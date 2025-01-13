@@ -178,9 +178,8 @@ func Login(c *gin.Context) {
 	}
 
 	var userSpaceDto models.UserSpaceDto
-	userSpaceDto.UseSpace = userInfo.UseSpace
+	userSpaceDto.UseSpace = getUseSpaceById(userInfo.UserId)
 	userSpaceDto.TotalSpace = userInfo.TotalSpace
-	//todo 查询已使用的空间大小
 	userSpaceJson, _ := json.Marshal(userSpaceDto)
 	models.RDb.Set(context.Background(), define.REDIS_USER_SPACE+userInfo.UserId, userSpaceJson, define.EXPIRE_DAY)
 
@@ -274,12 +273,18 @@ func GetUseSpace(c *gin.Context) {
 }
 
 func getUserUseSpace(userId string) models.UserSpaceDto {
-	result, _ := models.RDb.Get(context.Background(), define.REDIS_USER_SPACE+userId).Result()
+	result, err := models.RDb.Get(context.Background(), define.REDIS_USER_SPACE+userId).Result()
 	var userSpaceDto models.UserSpaceDto
+	if err != nil {
+		userSpaceDto.UseSpace = getUseSpaceById(userId)
+		userSpaceDto.TotalSpace = define.DEFAULT_TOTAL_SPACE
+		userSpaceJson, _ := json.Marshal(userSpaceDto)
+		models.RDb.Set(context.Background(), define.REDIS_USER_SPACE+userId, userSpaceJson, define.EXPIRE_DAY)
+		return userSpaceDto
+	}
+
 	json.Unmarshal([]byte(result), &userSpaceDto)
-	//todo 查询已使用的空间大小
-	fmt.Println(define.REDIS_USER_SPACE + userId)
-	fmt.Println(userSpaceDto)
+
 	return userSpaceDto
 }
 
