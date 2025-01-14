@@ -13,7 +13,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"io"
 	"mime/multipart"
+	"os"
 	"path"
 	"strconv"
 	"time"
@@ -45,16 +49,18 @@ func GetFileList(c *gin.Context) {
 	//db.Offset((pageNo - 1) * pageSize).Limit(pageSize)
 	//db.Find(&fileList)
 	fmt.Println("pageNo:", pageNo, "pageSize:", pageSize, "category:", category, "filePid:", filePid)
-	response.ResponseOKWithData(c, models.QueryPageList(db, pageNo, pageSize, &fileList))
+	pageResult := models.QueryPageList(db, pageNo, pageSize, &fileList)
+	response.ResponseOKWithData(c, pageResult)
+
 	return
 
 }
 
 func UploadFile(c *gin.Context) {
 	var uploadResultDto models.UploadResultDto
+	cover := ""
 	file, _ := c.FormFile("file")
 	fileName := c.PostForm("fileName")
-	//ext := path.Ext(fileName)
 	fileMd5 := c.PostForm("fileMd5")
 	chunkIndex, _ := strconv.Atoi(c.PostForm("chunkIndex"))
 	chunks, _ := strconv.Atoi(c.PostForm("chunks"))
@@ -100,7 +106,7 @@ func UploadFile(c *gin.Context) {
 	//判断磁盘空间
 	tempSize := getTempFileSize(fileId, userId.(string))
 	if userUseSpace.UseSpace+tempSize+int(file.Size) > userUseSpace.TotalSpace {
-		delFileChunks(fileId, userId.(string))
+		DelFileChunks(fileId, userId.(string))
 		response.ResponseFailWithData(c, 904, "上传失败,空间不足")
 		return
 	}
@@ -108,14 +114,15 @@ func UploadFile(c *gin.Context) {
 	server_id := define.GetServerId(hashRing.Hash.Get(chunk_id))
 	err := uploadChunk(chunk_id, server_id, file)
 	if err != nil {
-		delFileChunks(fileId, userId.(string))
+		DelFileChunks(fileId, userId.(string))
+
 		fmt.Println(err)
 		response.ResponseFailWithData(c, 0, "上传失败")
 		return
 	}
 	go func() {
 		//todo kafka
-		//异步存数据库
+		//异步存数据库(切片)
 		var chunk models.Chunk
 		chunk.FileId = fileId
 		chunk.ChunkId = chunk_id
@@ -126,21 +133,103 @@ func UploadFile(c *gin.Context) {
 
 	}()
 	saveTempFileSize(fileId, int(file.Size), userId.(string))
-	uploadResultDto.FileId = fileId
-	uploadResultDto.Status = define.UPLOADING
+
 	if chunkIndex == chunks-1 {
+		tx := models.Db.Begin()
+
+		//上传完毕最后一个切片，异步存储数据库(文件)
+		//month := models.MyMonth(time.Now())
+		fileSuffix := path.Ext(fileName)
+		//realFileName := helper.GetUUID() + fileSuffix
+		fileName = fileRename(fileName, userId.(string), filePid)
+		var newFile models.File
+		newFile.Id = fileId
+		newFile.FilePid = filePid
+		newFile.FileMd5 = fileMd5
+		newFile.UserId = userId.(string)
+		newFile.FileName = fileName
+		newFile.FilePath = userId.(string) + "_" + fileId
+		newFile.FileCategory = define.GetCategoryCodeBySuffix(fileSuffix)
+		newFile.FileType = define.GetTypeCodeBySuffix(fileSuffix)
+		newFile.Status = define.FILE_TRANSFER
+		newFile.FolderType = define.FILE_TYPE
+		newFile.DelFlag = define.USING
+
+		totalSize := getTempFileSize(fileId, userId.(string))
+		newFile.FileSize = totalSize
+		if err = tx.Model(new(models.File)).Create(&newFile).Error; err != nil {
+			DelFileChunks(fileId, userId.(string))
+			tx.Rollback()
+			response.ResponseFailWithData(c, 0, "上传失败")
+			return
+		}
+		if err = tx.Model(new(models.User)).Where("id = ?", userId.(string)).Update("use_space", gorm.Expr("use_space + ?", totalSize)).Error; err != nil {
+			DelFileChunks(fileId, userId.(string))
+			tx.Rollback()
+			response.ResponseFailWithData(c, 0, "上传失败")
+			return
+		}
+
+		tx.Commit()
+		go func() {
+			err2 := TransferFile(fileId)
+			if err2 != nil {
+				//重试
+			}
+			if err2 == nil {
+				models.Db.Model(new(models.File)).
+					Where("id = ?", fileId).
+					Where("status = ?", define.FILE_TRANSFER).
+					Clauses(clause.Locking{Strength: "UPDATE"}).
+					Updates(map[string]interface{}{
+						"status":     define.FILE_TRANSFER_SUCCESS,
+						"file_cover": cover,
+					})
+			}
+		}()
+		models.RDb.Del(context.Background(), define.REDIS_USER_SPACE+userId.(string))
+		//异步转码
+		uploadResultDto.FileId = fileId
 		uploadResultDto.Status = define.UPLOAD_FINISH
 		response.ResponseOKWithData(c, uploadResultDto)
 		return
 
 	}
 
+	uploadResultDto.FileId = fileId
+	uploadResultDto.Status = define.UPLOADING
 	response.ResponseOKWithData(c, uploadResultDto)
 	return
 
 }
 
-func delFileChunks(fileId string, userId string) {
+func TransferFile(fileId string) error {
+	var file models.File
+	models.Db.Model(new(models.File)).Where("id = ?", fileId).First(&file)
+	month := time.Now().Format("2006-01")
+	ext := path.Ext(file.FileName)
+	targetPath := "C:/Users/86150/GolandProjects/XcxcPan/dir" + "/" + month + "/" + file.UserId
+	if err := os.MkdirAll(targetPath, os.ModePerm); err != nil {
+		return err
+	}
+	targetFile, err := os.Create(targetPath + "/" + fileId + ext)
+	if err != nil {
+		return err
+	}
+	tempFile, err := helper.MergeChunksToFile(helper.GetSliceMap(file.UserId, fileId))
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(targetFile, tempFile)
+	if err != nil {
+		return err
+	}
+	tempFile.Close()
+	targetFile.Close()
+	return nil
+}
+
+func DelFileChunks(fileId string, userId string) {
 	chunkIdServerIdMap := redisUtil.GetHashInt(define.REDIS_CHUNK + userId + ":" + fileId)
 	for chunkId, serverId := range chunkIdServerIdMap {
 		client := fileServerClient_gRPC.GetClientById(serverId)
@@ -152,6 +241,7 @@ func delFileChunks(fileId string, userId string) {
 			fmt.Println(err)
 		}
 	}
+	models.RDb.Del(context.Background(), define.REDIS_CHUNK+userId+":"+fileId)
 
 }
 func uploadChunk(chunk_id string, server_id int, file *multipart.FileHeader) error {

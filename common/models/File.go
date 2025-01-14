@@ -58,3 +58,7 @@ func (f *File) BeforeUpdate(tx *gorm.DB) (err error) {
 	f.LastUpdateTime = MyTime(time.Now())
 	return
 }
+func (f *File) BeforeCreate(tx *gorm.DB) (err error) {
+	f.LastUpdateTime = MyTime(time.Now())
+	return
+}

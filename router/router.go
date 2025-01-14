@@ -31,7 +31,14 @@ func Router() *gin.Engine {
 	{
 		file.POST("/loadDataList", middlewares.AuthUserCheck(), service.GetFileList)
 		file.POST("/uploadFile", middlewares.AuthUserCheck(), service.UploadFile)
+
+		ts := file.Group("/ts")
+		{
+			ts.GET("/getVideoInfo/:fileId", middlewares.AuthUserCheck(), service.GetVideoInfo)
+		}
 	}
+
+	v1.GET("/video/test", service.TestVideo)
 
 	return r
 }

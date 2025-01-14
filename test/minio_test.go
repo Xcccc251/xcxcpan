@@ -1,12 +1,14 @@
 package test
 
 import (
-	"XcxcPan/common/minIO"
-	"fmt"
+	"XcxcPan/service"
 	"testing"
 )
 
 func TestMinio(t *testing.T) {
-	fmt.Println(minIO.CheckAvatarExists("user1.jpg"))
-
+	//service.DelFileChunks("xkYOvWxyUwvIQsRCIRTpXxpIadBFaRxx", "FbjBFbLoLy")
+	err := service.TransferFile("UMZHbZcOfJOrAfheLGubHoCssmEqGwVW")
+	if err != nil {
+		t.Error(err)
+	}
 }

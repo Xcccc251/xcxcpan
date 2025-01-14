@@ -14,6 +14,9 @@ var VIDEO_CATEGORY = map[string]int{
 	OTHERS: 5,
 }
 
+func GetCategoryCodeByCategory(category string) int {
+	return VIDEO_CATEGORY[category]
+}
 func ExistsCategory(category string) bool {
 	_, ok := VIDEO_CATEGORY[category]
 	return ok
