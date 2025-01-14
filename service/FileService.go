@@ -3,12 +3,12 @@ package service
 import (
 	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
 	"XcxcPan/common/define"
-	"XcxcPan/common/fileServerClient_gRPC"
 	hashRing "XcxcPan/common/hash"
 	"XcxcPan/common/helper"
 	"XcxcPan/common/models"
 	"XcxcPan/common/redisUtil"
 	"XcxcPan/common/response"
+	"XcxcPan/fileServerClient_gRPC"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -99,6 +99,7 @@ func UploadFile(c *gin.Context) {
 			uploadResultDto.Status = define.UPLOAD_SECONDS
 			updateUserUseSpace(userUseSpace, dbFile.FileSize, userId.(string))
 			response.ResponseOKWithData(c, uploadResultDto)
+			return
 		}
 
 	}
@@ -137,8 +138,6 @@ func UploadFile(c *gin.Context) {
 	if chunkIndex == chunks-1 {
 		tx := models.Db.Begin()
 
-		//上传完毕最后一个切片，异步存储数据库(文件)
-		//month := models.MyMonth(time.Now())
 		fileSuffix := path.Ext(fileName)
 		//realFileName := helper.GetUUID() + fileSuffix
 		fileName = fileRename(fileName, userId.(string), filePid)
@@ -148,7 +147,8 @@ func UploadFile(c *gin.Context) {
 		newFile.FileMd5 = fileMd5
 		newFile.UserId = userId.(string)
 		newFile.FileName = fileName
-		newFile.FilePath = userId.(string) + "_" + fileId
+		newFile.FilePath = define.FILE_DIR + "/" + userId.(string) + "/" + fileId
+		newFile.ChunkPrefix = userId.(string) + "_" + fileId
 		newFile.FileCategory = define.GetCategoryCodeBySuffix(fileSuffix)
 		newFile.FileType = define.GetTypeCodeBySuffix(fileSuffix)
 		newFile.Status = define.FILE_TRANSFER
@@ -171,24 +171,46 @@ func UploadFile(c *gin.Context) {
 		}
 
 		tx.Commit()
-		go func() {
-			err2 := TransferFile(fileId)
-			if err2 != nil {
-				//重试
-			}
-			if err2 == nil {
-				models.Db.Model(new(models.File)).
-					Where("id = ?", fileId).
-					Where("status = ?", define.FILE_TRANSFER).
-					Clauses(clause.Locking{Strength: "UPDATE"}).
-					Updates(map[string]interface{}{
-						"status":     define.FILE_TRANSFER_SUCCESS,
-						"file_cover": cover,
-					})
-			}
-		}()
+		if define.GetCategoryCodeBySuffix(fileSuffix) == define.VIDEO_CATEGORY[define.VIDEO] || define.GetCategoryCodeBySuffix(fileSuffix) == define.VIDEO_CATEGORY[define.IMAGE] {
+			go func() {
+				err2 := TransferFile(fileId)
+				if err2 != nil {
+					//重试
+				}
+				if err2 == nil {
+					if define.GetCategoryCodeBySuffix(fileSuffix) == define.VIDEO_CATEGORY[define.VIDEO] {
+						err2 := CreateThumbnailForVideo(define.FILE_DIR + "/" + userId.(string) + "/" + fileId + fileSuffix)
+						if err2 != nil {
+
+						} else {
+							cover = userId.(string) + "/" + fileId
+						}
+
+						CutFileForVideo(define.FILE_DIR + "/" + userId.(string) + "/" + fileId + fileSuffix)
+					} else if define.GetCategoryCodeBySuffix(fileSuffix) == define.VIDEO_CATEGORY[define.IMAGE] {
+						err2 := CreateThumbnailForImage(define.FILE_DIR + "/" + userId.(string) + "/" + fileId + fileSuffix)
+						if err2 != nil {
+
+						} else {
+							cover = userId.(string) + "/" + fileId
+						}
+					}
+
+					models.Db.Model(new(models.File)).
+						Where("id = ?", fileId).
+						Where("status = ?", define.FILE_TRANSFER).
+						Clauses(clause.Locking{Strength: "UPDATE"}).
+						Updates(map[string]interface{}{
+							"status":     define.FILE_TRANSFER_SUCCESS,
+							"file_cover": cover,
+						})
+				}
+			}()
+		}
+
 		models.RDb.Del(context.Background(), define.REDIS_USER_SPACE+userId.(string))
 		//异步转码
+
 		uploadResultDto.FileId = fileId
 		uploadResultDto.Status = define.UPLOAD_FINISH
 		response.ResponseOKWithData(c, uploadResultDto)
@@ -206,9 +228,8 @@ func UploadFile(c *gin.Context) {
 func TransferFile(fileId string) error {
 	var file models.File
 	models.Db.Model(new(models.File)).Where("id = ?", fileId).First(&file)
-	month := time.Now().Format("2006-01")
 	ext := path.Ext(file.FileName)
-	targetPath := "C:/Users/86150/GolandProjects/XcxcPan/dir" + "/" + month + "/" + file.UserId
+	targetPath := define.FILE_DIR + "/" + file.UserId
 	if err := os.MkdirAll(targetPath, os.ModePerm); err != nil {
 		return err
 	}

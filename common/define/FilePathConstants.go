@@ -17,3 +17,9 @@ var Server2_secretKey = "A3vsbHmAOYnVKHaYkbl2wTWPz6GsVnqCxvhcM6dL"
 var Image_bucketName = "xcxcpanimage"
 
 var DEFAULT_AVATAR_NAME = "default-avatar.jpg"
+
+var FILE_DIR = "E:/xcxcpan_file/dir"
+
+var THUMBNAIL = "thumbnail.jpg"
+
+var M3U8 = "index.m3u8"

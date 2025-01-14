@@ -22,6 +22,7 @@ type File struct {
 	Status         int    `gorm:"column:status" json:"status"`
 	RecoveryTime   MyTime `gorm:"column:recovery_time" json:"recoveryTime"`
 	DelFlag        int    `gorm:"column:del_flag;default:2" json:"delFlag"`
+	ChunkPrefix    string `gorm:"column:chunk_prefix" json:"chunkPrefix"`
 }
 type FileVo struct {
 	gorm.Model
@@ -41,6 +42,7 @@ type FileVo struct {
 	RecoveryTime   MyTime `gorm:"column:recovery_time" json:"recoveryTime"`
 	DelFlag        int    `gorm:"column:del_flag;default:2" json:"delFlag"`
 	CreateTime     MyTime `gorm:"column:created_at" json:"createTime"`
+	ChunkPrefix    string `gorm:"column:chunk_prefix" json:"chunkPrefix"`
 }
 
 type UploadResultDto struct {

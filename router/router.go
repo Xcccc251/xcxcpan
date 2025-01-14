@@ -31,10 +31,11 @@ func Router() *gin.Engine {
 	{
 		file.POST("/loadDataList", middlewares.AuthUserCheck(), service.GetFileList)
 		file.POST("/uploadFile", middlewares.AuthUserCheck(), service.UploadFile)
+		file.GET("/getImage/:userId/:fileId", middlewares.AuthUserCheck(), service.GetImage)
 
 		ts := file.Group("/ts")
 		{
-			ts.GET("/getVideoInfo/:fileId", middlewares.AuthUserCheck(), service.GetVideoInfo)
+			ts.GET("/getVideoInfo/:target", middlewares.AuthUserCheck(), service.GetVideoInfo)
 		}
 	}
 

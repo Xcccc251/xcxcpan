@@ -2,7 +2,7 @@ package Server_MinIO
 
 import (
 	"XcxcPan/Server/XcXcPanFileServer/define"
-	"XcxcPan/common/helper"
+	Server_Helper "XcxcPan/Server/XcXcPanFileServer/helper"
 	"context"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -44,7 +44,7 @@ func DownloadChunk(chunk_id string, serverId int) (file *os.File, err error) {
 	if err != nil {
 		return nil, err
 	}
-	tempFile, err := os.CreateTemp("", "downloaded-chunk-"+helper.GetRandomStr(10))
+	tempFile, err := os.CreateTemp("", "downloaded-chunk-"+Server_Helper.GetRandomStr(10))
 	if err != nil {
 		return nil, err
 	}

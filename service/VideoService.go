@@ -2,24 +2,34 @@ package service
 
 import (
 	"XcxcPan/common/define"
-	"XcxcPan/common/models"
 	"XcxcPan/common/response"
 	"github.com/gin-gonic/gin"
+	"path"
+	"strings"
 )
 
 func GetVideoInfo(c *gin.Context) {
-	fileId := c.Param("fileId")
+	target := c.Param("target")
 	userId, _ := c.Get("userId")
-	var file models.File
+	ext := path.Ext(target)
+	if ext != ".ts" {
+		m3u8Path := define.FILE_DIR + "/" + userId.(string) + "/" + target + "/" + define.M3U8
+		c.File(m3u8Path)
+		return
+	} else {
+		splitTarget := strings.Split(target, "_")
+		targetUserId := splitTarget[0]
+		targetFileId := splitTarget[1]
+		if targetUserId != userId.(string) {
+			response.ResponseFail(c)
+			return
+		}
 
-	db := models.Db.Model(new(models.File)).
-		Where("user_id = ?", userId.(string)).
-		Where("id = ?", fileId).
-		Where("file_type = ?", define.GetCategoryCodeByCategory(define.VIDEO))
-	db.Find(&file)
-	response.ResponseOKWithData(c, gin.H{
-		"src": "http://127.0.0.1:7090/api/video/test",
-	})
+		tsPath := define.FILE_DIR + "/" + targetUserId + "/" + targetFileId + "/" + target
+		c.File(tsPath)
+		return
+	}
+
 	return
 
 }
