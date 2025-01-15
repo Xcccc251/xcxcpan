@@ -1,14 +1,13 @@
 package logic
 
 import (
+	"XcxcPan/Server/XcXcPanFileServer2/internal/svc"
 	"XcxcPan/Server/common/helper"
 	Server_MinIO "XcxcPan/Server/common/minIO"
 	"XcxcPan/common/define"
 
+	"XcxcPan/Server/XcXcPanFileServer2/XcXcPanFileServer"
 	"context"
-
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
-	"XcxcPan/Server/XcXcPanFileServer/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -28,7 +27,7 @@ func NewUploadChunkLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Uploa
 }
 
 func (l *UploadChunkLogic) UploadChunk(in *XcXcPanFileServer.UploadChunkRequest) (*XcXcPanFileServer.UploadChunkResponse, error) {
-	if Server_MinIO.CheckChunkExists(in.FileName, define.Server1) {
+	if Server_MinIO.CheckChunkExists(in.FileName, define.Server2) {
 		return &XcXcPanFileServer.UploadChunkResponse{
 			Message: "文件已存在",
 		}, nil
@@ -39,7 +38,7 @@ func (l *UploadChunkLogic) UploadChunk(in *XcXcPanFileServer.UploadChunkRequest)
 		return nil, err
 	}
 
-	err = Server_MinIO.UploadChunk(in.FileName, file, define.Server1)
+	err = Server_MinIO.UploadChunk(in.FileName, file, define.Server2)
 	if err != nil {
 		return nil, err
 	}

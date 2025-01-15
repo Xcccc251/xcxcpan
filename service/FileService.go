@@ -20,12 +20,15 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
 func GetFileList(c *gin.Context) {
 	categoryStr := c.PostForm("category")
 	pageNo, _ := strconv.Atoi(c.PostForm("pageNo"))
+	filePid := c.PostForm("filePid")
 	pageSize, _ := strconv.Atoi(c.PostForm("pageSize"))
 	if pageNo == 0 {
 		pageNo = define.DEFAULT_PAGE_NO
@@ -33,7 +36,6 @@ func GetFileList(c *gin.Context) {
 	if pageSize == 0 {
 		pageSize = define.DEFAULT_PAGE_SIZE
 	}
-	filePid, _ := strconv.Atoi(c.PostForm("filePid"))
 	var category int
 	var fileList []models.FileVo
 	db := models.Db.Model(new(models.File))
@@ -151,7 +153,11 @@ func UploadFile(c *gin.Context) {
 		newFile.ChunkPrefix = userId.(string) + "_" + fileId
 		newFile.FileCategory = define.GetCategoryCodeBySuffix(fileSuffix)
 		newFile.FileType = define.GetTypeCodeBySuffix(fileSuffix)
-		newFile.Status = define.FILE_TRANSFER
+		if define.GetCategoryCodeBySuffix(fileSuffix) == define.VIDEO_CATEGORY[define.VIDEO] || define.GetCategoryCodeBySuffix(fileSuffix) == define.VIDEO_CATEGORY[define.IMAGE] {
+			newFile.Status = define.FILE_TRANSFER
+		} else {
+			newFile.Status = define.FILE_TRANSFER_SUCCESS
+		}
 		newFile.FolderType = define.FILE_TYPE
 		newFile.DelFlag = define.USING
 
@@ -225,6 +231,63 @@ func UploadFile(c *gin.Context) {
 
 }
 
+func FileRename(c *gin.Context) {
+	fileId := c.PostForm("fileId")
+	fileName := c.PostForm("fileName")
+	userId, _ := c.Get("userId")
+	var count int64
+	db := models.Db.Model(new(models.File)).
+		Where("id = ?", fileId).
+		Where("user_id = ?", userId)
+	db.Count(&count)
+	if count == 0 {
+		response.ResponseFail(c)
+		return
+	}
+	var file models.File
+	db.Find(&file)
+
+	if file.FolderType == define.FOLDER_TYPE {
+		if !CheckFolderNameIsValid(file.FilePid, fileName, userId.(string)) {
+			response.ResponseFailWithData(c, 0, "存在同名文件夹")
+			return
+		} else {
+			file.FileName = fileName
+			file.LastUpdateTime = models.MyTime(time.Now())
+			db.Update("last_update_time", file.LastUpdateTime)
+			db.Update("file_name", fileName)
+		}
+	} else {
+		ext := path.Ext(file.FileName)
+		if !CheckFileNameIsValid(file.FilePid, fileName+ext, userId.(string)) {
+			response.ResponseFailWithData(c, 0, "存在同名文件")
+			return
+		} else {
+			file.FileName = fileName + ext
+			file.LastUpdateTime = models.MyTime(time.Now())
+			db.Update("last_update_time", file.LastUpdateTime)
+			db.Update("file_name", fileName)
+		}
+	}
+	response.ResponseOKWithData(c, file)
+	return
+}
+func GetFolderList(c *gin.Context) {
+	filePid := c.PostForm("filePid")
+	currentFileIds := c.PostForm("currentFileIds")
+	FileIds := strings.Split(currentFileIds, ",")
+	userId, _ := c.Get("userId")
+	var folderList []models.File
+	models.Db.Model(new(models.File)).
+		Where("file_pid = ?", filePid).
+		Where("user_id = ?", userId.(string)).
+		Where("folder_type = ?", define.FOLDER_TYPE).
+		Where("id not in (?)", FileIds).
+		Find(&folderList)
+	response.ResponseOKWithData(c, folderList)
+	return
+}
+
 func TransferFile(fileId string) error {
 	var file models.File
 	models.Db.Model(new(models.File)).Where("id = ?", fileId).First(&file)
@@ -265,6 +328,115 @@ func DelFileChunks(fileId string, userId string) {
 	models.RDb.Del(context.Background(), define.REDIS_CHUNK+userId+":"+fileId)
 
 }
+
+//文件预览
+
+func GetFile(c *gin.Context) {
+	userId, _ := c.Get("userId")
+	fileId := c.Param("fileId")
+	data, err := DownloadFileToBytes(userId.(string), fileId)
+	if err != nil {
+		response.ResponseFailWithData(c, 0, "下载失败")
+		return
+	}
+	c.Data(200, "application/octet-stream", data)
+	return
+}
+
+func AddNewFolder(c *gin.Context) {
+	filePid := c.PostForm("filePid")
+	fileName := c.PostForm("fileName")
+	userId, _ := c.Get("userId")
+	if !CheckFolderNameIsValid(filePid, fileName, userId.(string)) {
+		response.ResponseFailWithData(c, 0, "文件夹名重复")
+		return
+	} else {
+		var newFile models.File
+		newFile.Id = helper.GetRandomStr(32)
+		newFile.FilePid = filePid
+		newFile.UserId = userId.(string)
+		newFile.FileName = fileName
+		newFile.FolderType = define.FOLDER_TYPE
+		newFile.Status = define.FILE_TRANSFER_SUCCESS
+		newFile.DelFlag = define.USING
+		models.Db.Model(new(models.File)).Create(&newFile)
+		response.ResponseOKWithData(c, newFile)
+		return
+	}
+
+}
+
+func GetFolderInfo(c *gin.Context) {
+	path := c.PostForm("path")
+	userId, _ := c.Get("userId")
+	pathArray := strings.Split(path, "/")
+	var folderList []models.File
+	models.Db.Model(new(models.File)).
+		Where("user_id = ?", userId).
+		Where("folder_type = ?", define.FOLDER_TYPE).
+		Where("id in ?", pathArray).
+		Order("field(id,'" + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(pathArray)), "','"), "[]") + "')").
+		Find(&folderList)
+	response.ResponseOKWithData(c, folderList)
+	return
+}
+
+func CheckFolderNameIsValid(filePid string, fileName string, userId string) bool {
+	var count int64
+	models.Db.Model(new(models.File)).
+		Where("file_pid = ? and file_name = ? and user_id = ?", filePid, fileName, userId).
+		Count(&count)
+	if count > 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
+func CheckFileNameIsValid(filePid string, fileName string, userId string) bool {
+	var count int64
+	models.Db.Model(new(models.File)).
+		Where("file_pid = ? and file_name = ? and user_id = ?", filePid, fileName, userId).
+		Count(&count)
+	if count > 0 {
+		return false
+	} else {
+		return true
+	}
+}
+func DownloadFileToBytes(userId string, fileId string) (data []byte, err error) {
+	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + userId + ":" + fileId)
+	//dataMap := sync.Map{} 并发map
+	dataMap := map[int][]byte{}
+	wg := sync.WaitGroup{}
+	var lock sync.Mutex
+	for chunkIndex, serverId := range hashInt {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			client := fileServerClient_gRPC.GetClientById(serverId)
+			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
+				FileName: userId + "_" + fileId + "_" + strconv.Itoa(chunkIndex),
+				Server:   int64(serverId),
+			})
+			//加锁保护map
+			lock.Lock()
+			dataMap[chunkIndex] = rsp.Data
+			lock.Unlock()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}()
+	}
+	wg.Wait()
+	data, err = helper.MergeChunks(dataMap)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+
+}
+
 func uploadChunk(chunk_id string, server_id int, file *multipart.FileHeader) error {
 	fileOpen, err := file.Open()
 	defer fileOpen.Close()

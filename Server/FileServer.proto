@@ -4,19 +4,11 @@ package XcXcPanFileServer;
 option go_package = "/XcXcPanFileServer";
 
 service XcXcPanFileService {
-  rpc SayHello(SayHelloRequest) returns (SayHelloResponse);
   rpc UploadChunk(UploadChunkRequest) returns (UploadChunkResponse);
   rpc DelChunk(DelChunkRequest) returns (DelChunkResponse);
   rpc DownloadChunk(DownloadChunkRequest) returns (DownloadChunkResponse);
 }
 
-message SayHelloRequest {
-  string name = 1;
-}
-
-message SayHelloResponse {
-  string message = 1;
-}
 
 message DownloadChunkRequest{
   string fileName = 1;

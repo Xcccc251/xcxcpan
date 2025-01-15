@@ -1,7 +1,7 @@
 package test
 
 import (
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
+	"XcxcPan/Server/XcXcPanFileServer1/XcXcPanFileServer"
 	"XcxcPan/common/define"
 	"XcxcPan/common/helper"
 	"XcxcPan/common/redisUtil"

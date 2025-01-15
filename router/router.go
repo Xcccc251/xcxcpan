@@ -32,7 +32,12 @@ func Router() *gin.Engine {
 		file.POST("/loadDataList", middlewares.AuthUserCheck(), service.GetFileList)
 		file.POST("/uploadFile", middlewares.AuthUserCheck(), service.UploadFile)
 		file.GET("/getImage/:userId/:fileId", middlewares.AuthUserCheck(), service.GetImage)
-
+		file.POST("/getFile/:fileId", middlewares.AuthUserCheck(), service.GetFile)
+		file.GET("/getFile/:fileId", middlewares.AuthUserCheck(), service.GetFile)
+		file.POST("/newFolder", middlewares.AuthUserCheck(), service.AddNewFolder)
+		file.POST("/getFolderInfo", middlewares.AuthUserCheck(), service.GetFolderInfo)
+		file.POST("/rename", middlewares.AuthUserCheck(), service.FileRename)
+		file.POST("/loadAllFolder", middlewares.AuthUserCheck(), service.GetFolderList)
 		ts := file.Group("/ts")
 		{
 			ts.GET("/getVideoInfo/:target", middlewares.AuthUserCheck(), service.GetVideoInfo)

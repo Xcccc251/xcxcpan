@@ -1,14 +1,12 @@
 package logic
 
 import (
+	"XcxcPan/Server/XcXcPanFileServer2/XcXcPanFileServer"
+	"XcxcPan/Server/XcXcPanFileServer2/internal/svc"
 	"XcxcPan/Server/common/helper"
 	Server_MinIO "XcxcPan/Server/common/minIO"
 	"XcxcPan/common/define"
 	"context"
-
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
-	"XcxcPan/Server/XcXcPanFileServer/internal/svc"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -27,7 +25,7 @@ func NewDownloadChunkLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Dow
 }
 
 func (l *DownloadChunkLogic) DownloadChunk(in *XcXcPanFileServer.DownloadChunkRequest) (*XcXcPanFileServer.DownloadChunkResponse, error) {
-	file, err := Server_MinIO.DownloadChunk(in.FileName, define.Server1)
+	file, err := Server_MinIO.DownloadChunk(in.FileName, define.Server2)
 	if err != nil {
 		return nil, err
 	}

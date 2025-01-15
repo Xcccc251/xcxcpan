@@ -1,13 +1,11 @@
 package logic
 
 import (
+	"XcxcPan/Server/XcXcPanFileServer2/XcXcPanFileServer"
+	"XcxcPan/Server/XcXcPanFileServer2/internal/svc"
 	Server_MinIO "XcxcPan/Server/common/minIO"
 	"XcxcPan/common/define"
 	"context"
-
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
-	"XcxcPan/Server/XcXcPanFileServer/internal/svc"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -26,7 +24,7 @@ func NewDelChunkLogic(ctx context.Context, svcCtx *svc.ServiceContext) *DelChunk
 }
 
 func (l *DelChunkLogic) DelChunk(in *XcXcPanFileServer.DelChunkRequest) (*XcXcPanFileServer.DelChunkResponse, error) {
-	err := Server_MinIO.DelChunk(in.FileName, define.Server1)
+	err := Server_MinIO.DelChunk(in.FileName, define.Server2)
 	if err != nil {
 		return nil, err
 	}

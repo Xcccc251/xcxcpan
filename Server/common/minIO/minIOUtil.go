@@ -1,8 +1,8 @@
 package Server_MinIO
 
 import (
-	"XcxcPan/Server/XcXcPanFileServer/define"
-	Server_Helper "XcxcPan/Server/XcXcPanFileServer/helper"
+	"XcxcPan/Server/common/define"
+	"XcxcPan/Server/common/helper"
 	"context"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"

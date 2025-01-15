@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
-	"XcxcPan/Server/XcXcPanFileServer/internal/logic"
-	"XcxcPan/Server/XcXcPanFileServer/internal/svc"
+	"XcxcPan/Server/XcXcPanFileServer2/XcXcPanFileServer"
+	"XcxcPan/Server/XcXcPanFileServer2/internal/logic"
+	"XcxcPan/Server/XcXcPanFileServer2/internal/svc"
 )
 
 type XcXcPanFileServiceServer struct {
