@@ -9,3 +9,5 @@ var USER_LOGIN_KEY = "user_login_key"
 var SESSION_USER_INFO = "user_info"
 
 var SESSION_USER_ID = "user_id"
+
+var SESSION_SHARE_INFO = "share_info:"

@@ -2,13 +2,15 @@ package service
 
 import (
 	"XcxcPan/common/define"
+	"XcxcPan/common/models"
 	"github.com/gin-gonic/gin"
 )
 
 func GetImage(c *gin.Context) {
-	userId := c.Param("userId")
+	var file models.File
 	fileId := c.Param("fileId")
-	imagePath := define.FILE_DIR + "/" + userId + "/" + fileId + "/" + define.THUMBNAIL
+	models.Db.Model(new(models.File)).Where("id = ?", fileId).Find(&file)
+	imagePath := define.FILE_DIR + "/" + file.UserId + "/" + fileId + "/" + define.THUMBNAIL
 	c.File(imagePath)
 	return
 }

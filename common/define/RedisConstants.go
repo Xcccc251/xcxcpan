@@ -6,4 +6,6 @@ var (
 	REDIS_USER_INFO  = "xcxcpan:user:info:"
 	REDIS_TEMP_FILE  = "xcxcpan:temp:file:"
 	REDIS_CHUNK      = "xcxcpan:chunk:"
+
+	REDIS_DOWNLOAD_CODE = "xcxcpan:download:"
 )

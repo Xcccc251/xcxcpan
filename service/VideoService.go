@@ -2,7 +2,7 @@ package service
 
 import (
 	"XcxcPan/common/define"
-	"XcxcPan/common/response"
+	"XcxcPan/common/models"
 	"github.com/gin-gonic/gin"
 	"path"
 	"strings"
@@ -10,20 +10,20 @@ import (
 
 func GetVideoInfo(c *gin.Context) {
 	target := c.Param("target")
-	userId, _ := c.Get("userId")
+	userId := c.GetString("userId")
+
 	ext := path.Ext(target)
 	if ext != ".ts" {
-		m3u8Path := define.FILE_DIR + "/" + userId.(string) + "/" + target + "/" + define.M3U8
+		var dbFile models.File
+		models.Db.Model(new(models.File)).Where("id = ?", target).Where("user_id = ?", userId).Find(&dbFile)
+		splitPrefix := strings.Split(dbFile.ChunkPrefix, "_")
+		m3u8Path := define.FILE_DIR + "/" + splitPrefix[0] + "/" + splitPrefix[1] + "/" + define.M3U8
 		c.File(m3u8Path)
 		return
 	} else {
 		splitTarget := strings.Split(target, "_")
 		targetUserId := splitTarget[0]
 		targetFileId := splitTarget[1]
-		if targetUserId != userId.(string) {
-			response.ResponseFail(c)
-			return
-		}
 
 		tsPath := define.FILE_DIR + "/" + targetUserId + "/" + targetFileId + "/" + target
 		c.File(tsPath)

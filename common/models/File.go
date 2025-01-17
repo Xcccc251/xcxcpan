@@ -44,7 +44,12 @@ type FileVo struct {
 	CreateTime     MyTime `gorm:"column:created_at" json:"createTime"`
 	ChunkPrefix    string `gorm:"column:chunk_prefix" json:"chunkPrefix"`
 }
-
+type DownloadDto struct {
+	DownloadCode string `json:"downloadCode"`
+	UserId       string `json:"userId"`
+	FileId       string `json:"fileId"`
+	FileName     string `json:"fileName"`
+}
 type UploadResultDto struct {
 	FileId string `json:"fileId"`
 	Status string `json:"status"`

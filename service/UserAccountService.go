@@ -325,6 +325,16 @@ func UpdateUserAvatar(c *gin.Context) {
 	return
 }
 
+func UpdatePassword(c *gin.Context) {
+	password := c.PostForm("password")
+	password = helper.GetMd5(password)
+	userId, _ := c.Get("userId")
+	models.Db.Model(new(models.User)).Where("id = ?", userId.(string)).Update("password", password)
+	response.ResponseOK(c)
+	return
+
+}
+
 func QQLogin(c *gin.Context) {
 	params := url.Values{}
 	params.Add("response_type", "code")

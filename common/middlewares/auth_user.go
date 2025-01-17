@@ -4,6 +4,7 @@ import (
 	"XcxcPan/common/define"
 	"XcxcPan/common/models"
 	"context"
+	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
@@ -12,8 +13,9 @@ func AuthUserCheck() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userId := session.Get(define.SESSION_USER_ID)
+		fmt.Println("userId", userId)
 		if userId == nil {
-			c.JSON(901, gin.H{
+			c.JSON(200, gin.H{
 				"code": 901,
 				"info": "用户未登录",
 			})

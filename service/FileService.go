@@ -1,6 +1,7 @@
 package service
 
 import (
+	"XcxcPan/Kafka"
 	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
 	"XcxcPan/common/define"
 	hashRing "XcxcPan/common/hash"
@@ -27,8 +28,13 @@ import (
 
 func GetFileList(c *gin.Context) {
 	categoryStr := c.PostForm("category")
+	fileName := c.PostForm("fileNameFuzzy")
 	pageNo, _ := strconv.Atoi(c.PostForm("pageNo"))
 	filePid := c.PostForm("filePid")
+	if filePid == "" {
+		filePid = "0"
+	}
+
 	pageSize, _ := strconv.Atoi(c.PostForm("pageSize"))
 	if pageNo == 0 {
 		pageNo = define.DEFAULT_PAGE_NO
@@ -47,6 +53,7 @@ func GetFileList(c *gin.Context) {
 	db.Where("user_id = ?", userId.(string))
 	db.Where("del_flag = ?", define.USING)
 	db.Where("file_pid = ?", filePid)
+	db.Where("file_name like ?", "%"+fileName+"%")
 	db.Order("last_update_time desc")
 	//db.Offset((pageNo - 1) * pageSize).Limit(pageSize)
 	//db.Find(&fileList)
@@ -334,7 +341,11 @@ func DelFileChunks(fileId string, userId string) {
 func GetFile(c *gin.Context) {
 	userId, _ := c.Get("userId")
 	fileId := c.Param("fileId")
-	data, err := DownloadFileToBytes(userId.(string), fileId)
+
+	var dbFile models.File
+	models.Db.Model(new(models.File)).Where("id = ?", fileId).Where("user_id = ?", userId).Find(&dbFile)
+	splitPrefix := strings.Split(dbFile.ChunkPrefix, "_")
+	data, err := DownloadFileToBytes(splitPrefix[0], splitPrefix[1])
 	if err != nil {
 		response.ResponseFailWithData(c, 0, "下载失败")
 		return
@@ -381,10 +392,185 @@ func GetFolderInfo(c *gin.Context) {
 	return
 }
 
+func ChangeFileFolder(c *gin.Context) {
+	userId, _ := c.Get("userId")
+	fileIds := c.PostForm("fileIds")
+	filePid := c.PostForm("filePid")
+	ids := strings.Split(fileIds, ",")
+	for _, v := range ids {
+		if v == filePid {
+			response.ResponseFail(c)
+			return
+		}
+		var thisFile models.File
+		var count int64
+		models.Db.Model(new(models.File)).
+			Where("id = ?", v).
+			Where("user_id = ?", userId).Find(&thisFile)
+		models.Db.Model(new(models.File)).
+			Where("user_id = ?", userId).
+			Where("file_pid = ?", filePid).
+			Where("file_name = ?", thisFile.FileName).Count(&count)
+
+		if count > 0 {
+			response.ResponseFailWithData(c, 0, "目标文件夹存在同名文件或文件夹")
+			return
+		}
+
+	}
+	models.Db.Model(new(models.File)).
+		Where("user_id = ?", userId).
+		Where("id in ?", ids).
+		Update("file_pid", filePid)
+	response.ResponseOK(c)
+	return
+}
+
+func CreateDownloadUrl(c *gin.Context) {
+	fileId := c.Param("fileId")
+	userId, _ := c.Get("userId")
+	var file models.File
+	var count int64
+	db := models.Db.Model(new(models.File)).
+		Where("id = ?", fileId).
+		Where("user_id = ?", userId)
+	db.Count(&count)
+	db.Find(&file)
+	if count == 0 {
+		response.ResponseFailWithData(c, 600, "文件不存在")
+		return
+	} else if file.FolderType == define.FOLDER_TYPE {
+		response.ResponseFailWithData(c, 600, "文件夹不能下载")
+		return
+	}
+	var dbFile models.File
+	models.Db.Model(new(models.File)).Where("id = ?", fileId).Where("user_id = ?", userId).Find(&dbFile)
+	splitPrefix := strings.Split(dbFile.ChunkPrefix, "_")
+	code := helper.GetRandomStr(32)
+	var downloadDto models.DownloadDto
+	downloadDto.DownloadCode = code
+	downloadDto.FileId = splitPrefix[1]
+	downloadDto.UserId = splitPrefix[0]
+	downloadDto.FileName = file.FileName
+	downloadJson, _ := json.Marshal(&downloadDto)
+
+	models.RDb.Set(context.Background(), define.REDIS_DOWNLOAD_CODE+":"+code, downloadJson, 5*time.Minute)
+
+	response.ResponseOKWithData(c, code)
+	return
+
+}
+
+func Download(c *gin.Context) {
+	code := c.Param("code")
+	var downloadDto models.DownloadDto
+	result, _ := models.RDb.Get(context.Background(), define.REDIS_DOWNLOAD_CODE+":"+code).Result()
+	json.Unmarshal([]byte(result), &downloadDto)
+
+	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + downloadDto.UserId + ":" + downloadDto.FileId)
+	var dataMap = map[int][]byte{}
+	wg := sync.WaitGroup{}
+	var lock sync.Mutex
+	for chunkIndex, serverId := range hashInt {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			client := fileServerClient_gRPC.GetClientById(serverId)
+			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
+				FileName: downloadDto.UserId + "_" + downloadDto.FileId + "_" + strconv.Itoa(chunkIndex),
+				Server:   int64(serverId),
+			})
+			//加锁保护map
+			lock.Lock()
+			dataMap[chunkIndex] = rsp.Data
+			lock.Unlock()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}()
+	}
+	wg.Wait()
+	data, err := helper.MergeChunks(dataMap)
+	if err != nil {
+		response.ResponseFailWithData(c, 0, "下载失败")
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename="+downloadDto.FileName)
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Length", strconv.Itoa(len(data)))
+	c.Data(200, "application/octet-stream", data)
+	return
+
+}
+
+func DelFileToRecycle(c *gin.Context) {
+	userId, _ := c.Get("userId")
+	fileIds := c.PostForm("fileIds")
+	ids := strings.Split(fileIds, ",")
+	finalIds := []string{}
+	finalIds = append(finalIds, ids...)
+	wg := sync.WaitGroup{}
+	mu := sync.Mutex{}
+	delIds := []string{}
+	for _, v := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			childIds := FindChildrenIds(v, userId.(string))
+			mu.Lock()
+			delIds = append(delIds, childIds...)
+			mu.Unlock()
+		}()
+
+	}
+	wg.Wait()
+
+	recoveryTime := models.MyTime(time.Now())
+
+	go func() {
+		allIds := append(finalIds, delIds...)
+		delMessageJson, _ := json.Marshal(allIds)
+		Kafka.ProduceMessageWithTime(define.KAFKA_DEL_TOPIC, delMessageJson, recoveryTime, define.KAFKA_DEL_DURATION)
+	}()
+
+	models.Db.Model(new(models.File)).
+		Where("id in ?", delIds).
+		Update("del_flag", define.DEL).
+		Update("recovery_time", recoveryTime)
+
+	models.Db.Model(new(models.File)).
+		Where("id in ?", finalIds).
+		Update("del_flag", define.RECYCLE).
+		Update("recovery_time", recoveryTime)
+	response.ResponseOK(c)
+	return
+
+}
+
+func FindChildrenIds(fileId string, userId string) []string {
+	var file models.File
+	var allIds []string
+	models.Db.Model(new(models.File)).
+		Where("file_pid = ? and user_id = ?", fileId, userId).Find(&file)
+	if file.FolderType == define.FOLDER_TYPE {
+		var childIds []string
+		models.Db.Model(new(models.File)).
+			Select("id").
+			Where("file_pid = ? and user_id = ?", fileId, userId).
+			Find(&childIds)
+		for _, v := range childIds {
+			childIds = append(childIds, FindChildrenIds(v, userId)...)
+		}
+		allIds = append(allIds, childIds...)
+	}
+	return allIds
+}
+
 func CheckFolderNameIsValid(filePid string, fileName string, userId string) bool {
 	var count int64
 	models.Db.Model(new(models.File)).
 		Where("file_pid = ? and file_name = ? and user_id = ?", filePid, fileName, userId).
+		Where("del_flag = ?", define.USING).
 		Count(&count)
 	if count > 0 {
 		return false
@@ -397,6 +583,7 @@ func CheckFileNameIsValid(filePid string, fileName string, userId string) bool {
 	var count int64
 	models.Db.Model(new(models.File)).
 		Where("file_pid = ? and file_name = ? and user_id = ?", filePid, fileName, userId).
+		Where("del_flag = ?", define.USING).
 		Count(&count)
 	if count > 0 {
 		return false
@@ -488,7 +675,8 @@ func fileRename(fileName string, userId string, filePid string) string {
 	db := models.Db.Model(new(models.File)).
 		Where("file_name = ?", fileName).
 		Where("user_id = ?", userId).
-		Where("file_pid = ?", filePid)
+		Where("file_pid = ?", filePid).
+		Where("del_flag = ?", define.USING)
 	var count int64
 	db.Count(&count)
 	if count > 0 {

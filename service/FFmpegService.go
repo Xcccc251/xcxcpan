@@ -26,6 +26,7 @@ func CutFileForVideo(videoPath string) error {
 		"-c:v", "libx264", // 视频编码
 		"-c:a", "aac", // 音频编码
 		"-hls_time", "30", // 每个分片的时长
+		"-hls_list_size", "0", // 保留完整的播放列表
 		"-hls_segment_filename", outputTsTemplate, // TS 文件模板
 		outputM3U8, // 输出的 M3U8 文件
 	)
