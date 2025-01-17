@@ -122,6 +122,7 @@ func UploadFile(c *gin.Context) {
 	}
 	chunk_id := userId.(string) + "_" + fileId + "_" + strconv.Itoa(chunkIndex)
 	server_id := define.GetServerId(hashRing.Hash.Get(chunk_id))
+	fmt.Println("chunk_id:", chunk_id, "server:", hashRing.Hash.Get(chunk_id))
 	err := uploadChunk(chunk_id, server_id, file)
 	if err != nil {
 		DelFileChunks(fileId, userId.(string))
@@ -131,7 +132,6 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 	go func() {
-		//todo kafka
 		//异步存数据库(切片)
 		var chunk models.Chunk
 		chunk.FileId = fileId

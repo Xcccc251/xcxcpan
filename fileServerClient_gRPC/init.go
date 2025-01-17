@@ -21,7 +21,7 @@ func GetClientById(id int) XcXcPanFileServer.XcXcPanFileServiceClient {
 func FileServerClient_1() XcXcPanFileServer.XcXcPanFileServiceClient {
 	conn := zrpc.MustNewClient(zrpc.RpcClientConf{
 		Etcd: discov.EtcdConf{
-			Hosts: []string{"127.0.0.1:2379"},
+			Hosts: []string{"1.94.166.62:2379"},
 			Key:   "fileserver1.rpc",
 		},
 	})
@@ -31,7 +31,7 @@ func FileServerClient_1() XcXcPanFileServer.XcXcPanFileServiceClient {
 func FileServerClient_2() XcXcPanFileServer.XcXcPanFileServiceClient {
 	conn := zrpc.MustNewClient(zrpc.RpcClientConf{
 		Etcd: discov.EtcdConf{
-			Hosts: []string{"127.0.0.1:2379"},
+			Hosts: []string{"1.94.166.62:2379"},
 			Key:   "fileserver2.rpc",
 		},
 	})

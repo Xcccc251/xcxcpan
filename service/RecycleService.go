@@ -2,10 +2,13 @@ package service
 
 import (
 	"XcxcPan/common/define"
+	"XcxcPan/common/fileUtils"
 	"XcxcPan/common/models"
 	"XcxcPan/common/response"
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -111,11 +114,52 @@ func DelFile(c *gin.Context) {
 	wg.Wait()
 
 	finalIds = append(finalIds, delIds...)
-	//todo 消息队列
+
 	models.Db.Model(new(models.File)).
 		Where("id in ?", finalIds).
 		Where("user_id = ?", userId.(string)).
-		Delete(&models.File{})
+		Update("del_flag", define.DEL)
+	fmt.Println(finalIds)
+	go func() {
+		for _, fileId := range finalIds {
+			var file models.File
+			models.Db.Model(new(models.File)).
+				Where("id = ?", fileId).Find(&file)
+
+			models.Db.Model(new(models.File)).Where("id = ?", fileId).Delete(&models.File{})
+
+			if file.ChunkPrefix == "" {
+				continue
+			}
+
+			var count int64
+			models.Db.Model(new(models.File)).
+				Where("chunk_prefix = ?", file.ChunkPrefix).
+				Where("id != ?", fileId).
+				Where("del_flag != ?", define.DEL).Count(&count)
+			if count > 0 {
+				continue
+			}
+			splitChunkPrefix := strings.Split(file.ChunkPrefix, "_")
+			fmt.Println("删除切片")
+			fileUtils.DelFileChunks(splitChunkPrefix[1], splitChunkPrefix[0])
+
+			if file.FileCategory == define.GetCategoryCodeByCategory(define.VIDEO) {
+				path := define.FILE_DIR + "/" + splitChunkPrefix[0] + "/" + splitChunkPrefix[1]
+				os.RemoveAll(path)
+			} else if file.FileCategory == define.GetCategoryCodeByCategory(define.IMAGE) {
+				path := define.FILE_DIR + "/" + splitChunkPrefix[0] + "/" + splitChunkPrefix[1]
+				os.RemoveAll(path)
+			}
+
+			models.RDb.Del(context.Background(), define.REDIS_CHUNK+splitChunkPrefix[0]+":"+splitChunkPrefix[1])
+
+		}
+		models.Db.Model(new(models.File)).
+			Where("id in ?", finalIds).
+			Where("user_id = ?", userId.(string)).
+			Delete(&models.File{})
+	}()
 
 	models.RDb.Del(context.Background(), define.REDIS_USER_SPACE+userId.(string))
 	response.ResponseOK(c)
