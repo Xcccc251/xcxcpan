@@ -1,13 +1,12 @@
 package service
 
 import (
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
+	"XcxcPan/StorageGroup"
 	"XcxcPan/common/define"
 	"XcxcPan/common/helper"
 	"XcxcPan/common/models"
 	"XcxcPan/common/redisUtil"
 	"XcxcPan/common/response"
-	"XcxcPan/fileServerClient_gRPC"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -389,26 +388,22 @@ func Download4ShareFile(c *gin.Context) {
 	result, _ := models.RDb.Get(context.Background(), define.REDIS_DOWNLOAD_CODE+":"+code).Result()
 	json.Unmarshal([]byte(result), &downloadDto)
 
-	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + downloadDto.UserId + ":" + downloadDto.FileId)
+	chunkMap := redisUtil.GetChunkMap(define.REDIS_CHUNK + downloadDto.UserId + ":" + downloadDto.FileId)
 	var dataMap = map[int][]byte{}
 	wg := sync.WaitGroup{}
 	var lock sync.Mutex
-	for chunkIndex, serverId := range hashInt {
+	for chunkIndex, serverNode := range chunkMap {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client := fileServerClient_gRPC.GetClientById(serverId)
-			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
-				FileName: downloadDto.UserId + "_" + downloadDto.FileId + "_" + strconv.Itoa(chunkIndex),
-				Server:   int64(serverId),
-			})
-			//加锁保护map
-			lock.Lock()
-			dataMap[chunkIndex] = rsp.Data
-			lock.Unlock()
+			data, err := StorageGroup.Server.GrpcGetters[serverNode].Download(downloadDto.UserId + "_" + downloadDto.FileId + "_" + strconv.Itoa(chunkIndex))
 			if err != nil {
 				fmt.Println(err)
 			}
+			//加锁保护map
+			lock.Lock()
+			dataMap[chunkIndex] = data
+			lock.Unlock()
 		}()
 	}
 	wg.Wait()

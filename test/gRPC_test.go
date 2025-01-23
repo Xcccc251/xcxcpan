@@ -4,6 +4,7 @@ import (
 	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
 	"XcxcPan/common/define"
 	"XcxcPan/common/helper"
+	"XcxcPan/common/models"
 	"XcxcPan/common/redisUtil"
 	"XcxcPan/fileServerClient_gRPC"
 	"context"
@@ -37,7 +38,7 @@ func TestGRPC(t *testing.T) {
 }
 
 func TestDownloadChunk(t *testing.T) {
-	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + "FbjBFbLoLy" + ":" + "ZQbrDrLIJQBIPZjxIpDAqEGxzkaGCmqn")
+	hashInt := redisUtil.GetChunkMap(define.REDIS_CHUNK + "FbjBFbLoLy" + ":" + "XZJYWUTetSPgvQgSwrVjlxEfxAdDvnNZ")
 	var dataMap = map[int][]byte{}
 	wg := sync.WaitGroup{}
 	now := time.Now()
@@ -45,11 +46,16 @@ func TestDownloadChunk(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			fmt.Println(chunkIndex)
 			client := fileServerClient_gRPC.GetClientById(serverId)
-			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
-				FileName: "FbjBFbLoLy" + "_" + "ZQbrDrLIJQBIPZjxIpDAqEGxzkaGCmqn" + "_" + strconv.Itoa(chunkIndex),
+			ctx, _ := context.WithTimeout(context.Background(), time.Minute*30)
+			rsp, err := client.DownloadChunk(ctx, &XcXcPanFileServer.DownloadChunkRequest{
+				FileName: "FbjBFbLoLy" + "_" + "XZJYWUTetSPgvQgSwrVjlxEfxAdDvnNZ" + "_" + strconv.Itoa(chunkIndex),
 				Server:   int64(serverId),
 			})
+			if err != nil {
+				t.Error(err)
+			}
 			dataMap[chunkIndex] = rsp.Data
 			if err != nil {
 				t.Error(err)
@@ -70,20 +76,23 @@ func TestDownloadChunk(t *testing.T) {
 }
 
 func TestDownloadChunk2(t *testing.T) {
-	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + "FbjBFbLoLy" + ":" + "ZQbrDrLIJQBIPZjxIpDAqEGxzkaGCmqn")
+	hashInt := redisUtil.GetChunkMap(define.REDIS_CHUNK + "FbjBFbLoLy" + ":" + "fdamHkpjhuaVMArDmabexOzKhDIKjUDR")
 	var dataMap = map[int][]byte{}
 
 	now := time.Now()
 	for chunkIndex, serverId := range hashInt {
 		client := fileServerClient_gRPC.GetClientById(serverId)
 		rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
-			FileName: "FbjBFbLoLy" + "_" + "ZQbrDrLIJQBIPZjxIpDAqEGxzkaGCmqn" + "_" + strconv.Itoa(chunkIndex),
+			FileName: "FbjBFbLoLy" + "_" + "fdamHkpjhuaVMArDmabexOzKhDIKjUDR" + "_" + strconv.Itoa(chunkIndex),
 			Server:   int64(serverId),
 		})
+		fmt.Println(len(rsp.Data))
+		fmt.Println("2")
 		dataMap[chunkIndex] = rsp.Data
 		if err != nil {
 			t.Error(err)
 		}
+
 	}
 
 	end := time.Now()
@@ -95,4 +104,20 @@ func TestDownloadChunk2(t *testing.T) {
 	}
 	os.WriteFile(outputFile, data, 0666)
 
+}
+
+func TestDelChunks(t *testing.T) {
+	chunkIdServerIdMap := redisUtil.GetChunkMap(define.REDIS_CHUNK + "FbjBFbLoLy" + ":" + "XZJYWUTetSPgvQgSwrVjlxEfxAdDvnNZ")
+	for chunkId, serverId := range chunkIdServerIdMap {
+		client := fileServerClient_gRPC.GetClientById(serverId)
+		ctx, _ := context.WithTimeout(context.Background(), time.Minute*30)
+		_, err := client.DelChunk(ctx, &XcXcPanFileServer.DelChunkRequest{
+			FileName: "FbjBFbLoLy" + "_" + "XZJYWUTetSPgvQgSwrVjlxEfxAdDvnNZ" + "_" + strconv.Itoa(chunkId),
+			Server:   int64(serverId),
+		})
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	models.RDb.Del(context.Background(), define.REDIS_CHUNK+"FbjBFbLoLy"+":"+"XZJYWUTetSPgvQgSwrVjlxEfxAdDvnNZ")
 }

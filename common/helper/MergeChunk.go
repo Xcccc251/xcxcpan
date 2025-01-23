@@ -1,12 +1,10 @@
 package helper
 
 import (
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
+	"XcxcPan/StorageGroup"
 	"XcxcPan/common/define"
 	"XcxcPan/common/redisUtil"
-	"XcxcPan/fileServerClient_gRPC"
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -38,22 +36,21 @@ func MergeChunks(sliceMap map[int][]byte) ([]byte, error) {
 }
 
 func GetSliceMap(userId string, fileId string) map[int][]byte {
-	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + userId + ":" + fileId)
+	chunkMap := redisUtil.GetChunkMap(define.REDIS_CHUNK + userId + ":" + fileId)
 	var dataMap = map[int][]byte{}
 	wg := sync.WaitGroup{}
 	var lock sync.Mutex
-	for chunkIndex, serverId := range hashInt {
+	for chunkIndex, serverNode := range chunkMap {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client := fileServerClient_gRPC.GetClientById(serverId)
-			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
-				FileName: userId + "_" + fileId + "_" + strconv.Itoa(chunkIndex),
-				Server:   int64(serverId),
-			})
+			data, err := StorageGroup.Server.GrpcGetters[serverNode].Download(userId + "_" + fileId + "_" + strconv.Itoa(chunkIndex))
+			if err != nil {
+				fmt.Println(err)
+			}
 			//加锁保护map
 			lock.Lock()
-			dataMap[chunkIndex] = rsp.Data
+			dataMap[chunkIndex] = data
 			lock.Unlock()
 			if err != nil {
 				fmt.Println(err)

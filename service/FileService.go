@@ -2,14 +2,12 @@ package service
 
 import (
 	"XcxcPan/Kafka"
-	"XcxcPan/Server/XcXcPanFileServer/XcXcPanFileServer"
+	"XcxcPan/StorageGroup"
 	"XcxcPan/common/define"
-	hashRing "XcxcPan/common/hash"
 	"XcxcPan/common/helper"
 	"XcxcPan/common/models"
 	"XcxcPan/common/redisUtil"
 	"XcxcPan/common/response"
-	"XcxcPan/fileServerClient_gRPC"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 	"path"
@@ -121,9 +120,7 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 	chunk_id := userId.(string) + "_" + fileId + "_" + strconv.Itoa(chunkIndex)
-	server_id := define.GetServerId(hashRing.Hash.Get(chunk_id))
-	fmt.Println("chunk_id:", chunk_id, "server:", hashRing.Hash.Get(chunk_id))
-	err := uploadChunk(chunk_id, server_id, file)
+	err := uploadChunk(chunk_id, file)
 	if err != nil {
 		DelFileChunks(fileId, userId.(string))
 
@@ -136,10 +133,10 @@ func UploadFile(c *gin.Context) {
 		var chunk models.Chunk
 		chunk.FileId = fileId
 		chunk.ChunkId = chunk_id
-		chunk.ServerId = server_id
+		chunk.ServerNode = StorageGroup.Server.Peers.Get(chunk_id)
 		models.Db.Model(new(models.Chunk)).Create(&chunk)
 		//redis index server键值对
-		redisUtil.SetHash(define.REDIS_CHUNK+userId.(string)+":"+fileId, chunkIndex, server_id)
+		redisUtil.SetHash(define.REDIS_CHUNK+userId.(string)+":"+fileId, chunkIndex, chunk.ServerNode)
 
 	}()
 	saveTempFileSize(fileId, int(file.Size), userId.(string))
@@ -321,19 +318,14 @@ func TransferFile(fileId string) error {
 }
 
 func DelFileChunks(fileId string, userId string) {
-	chunkIdServerIdMap := redisUtil.GetHashInt(define.REDIS_CHUNK + userId + ":" + fileId)
-	for chunkId, serverId := range chunkIdServerIdMap {
-		client := fileServerClient_gRPC.GetClientById(serverId)
-		_, err := client.DelChunk(context.Background(), &XcXcPanFileServer.DelChunkRequest{
-			FileName: userId + "_" + fileId + "_" + strconv.Itoa(chunkId),
-			Server:   int64(serverId),
-		})
+	chunkMap := redisUtil.GetChunkMap(define.REDIS_CHUNK + userId + ":" + fileId)
+	for chunkId, serverNode := range chunkMap {
+		_, err := StorageGroup.Server.GrpcGetters[serverNode].Del(userId + "_" + fileId + "_" + strconv.Itoa(chunkId))
 		if err != nil {
 			fmt.Println(err)
 		}
 	}
 	models.RDb.Del(context.Background(), define.REDIS_CHUNK+userId+":"+fileId)
-
 }
 
 //文件预览
@@ -466,23 +458,18 @@ func Download(c *gin.Context) {
 	var downloadDto models.DownloadDto
 	result, _ := models.RDb.Get(context.Background(), define.REDIS_DOWNLOAD_CODE+":"+code).Result()
 	json.Unmarshal([]byte(result), &downloadDto)
-
-	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + downloadDto.UserId + ":" + downloadDto.FileId)
+	chunkMap := redisUtil.GetChunkMap(define.REDIS_CHUNK + downloadDto.UserId + ":" + downloadDto.FileId)
 	var dataMap = map[int][]byte{}
 	wg := sync.WaitGroup{}
 	var lock sync.Mutex
-	for chunkIndex, serverId := range hashInt {
+	for chunkIndex, serverNode := range chunkMap {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client := fileServerClient_gRPC.GetClientById(serverId)
-			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
-				FileName: downloadDto.UserId + "_" + downloadDto.FileId + "_" + strconv.Itoa(chunkIndex),
-				Server:   int64(serverId),
-			})
+			data, err := StorageGroup.Server.GrpcGetters[serverNode].Download(downloadDto.UserId + "_" + downloadDto.FileId + "_" + strconv.Itoa(chunkIndex))
 			//加锁保护map
 			lock.Lock()
-			dataMap[chunkIndex] = rsp.Data
+			dataMap[chunkIndex] = data
 			lock.Unlock()
 			if err != nil {
 				fmt.Println(err)
@@ -591,32 +578,29 @@ func CheckFileNameIsValid(filePid string, fileName string, userId string) bool {
 		return true
 	}
 }
-func DownloadFileToBytes(userId string, fileId string) (data []byte, err error) {
-	hashInt := redisUtil.GetHashInt(define.REDIS_CHUNK + userId + ":" + fileId)
+func DownloadFileToBytes(userId string, fileId string) ([]byte, error) {
+	chunkMap := redisUtil.GetChunkMap(define.REDIS_CHUNK + userId + ":" + fileId)
 	//dataMap := sync.Map{} 并发map
 	dataMap := map[int][]byte{}
 	wg := sync.WaitGroup{}
 	var lock sync.Mutex
-	for chunkIndex, serverId := range hashInt {
+	for chunkIndex, serverNode := range chunkMap {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client := fileServerClient_gRPC.GetClientById(serverId)
-			rsp, err := client.DownloadChunk(context.Background(), &XcXcPanFileServer.DownloadChunkRequest{
-				FileName: userId + "_" + fileId + "_" + strconv.Itoa(chunkIndex),
-				Server:   int64(serverId),
-			})
-			//加锁保护map
-			lock.Lock()
-			dataMap[chunkIndex] = rsp.Data
-			lock.Unlock()
+			data, err := StorageGroup.Server.GrpcGetters[serverNode].Download(userId + "_" + fileId + "_" + strconv.Itoa(chunkIndex))
 			if err != nil {
 				fmt.Println(err)
 			}
+
+			//加锁保护map
+			lock.Lock()
+			dataMap[chunkIndex] = data
+			lock.Unlock()
 		}()
 	}
 	wg.Wait()
-	data, err = helper.MergeChunks(dataMap)
+	data, err := helper.MergeChunks(dataMap)
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +608,7 @@ func DownloadFileToBytes(userId string, fileId string) (data []byte, err error) 
 
 }
 
-func uploadChunk(chunk_id string, server_id int, file *multipart.FileHeader) error {
+func uploadChunk(chunk_id string, file *multipart.FileHeader) error {
 	fileOpen, err := file.Open()
 	defer fileOpen.Close()
 	if err != nil {
@@ -639,16 +623,28 @@ func uploadChunk(chunk_id string, server_id int, file *multipart.FileHeader) err
 	if err != nil {
 		return err
 	}
-	client := fileServerClient_gRPC.GetClientById(server_id)
-	_, err = client.UploadChunk(context.Background(), &XcXcPanFileServer.UploadChunkRequest{
-		Data:     data,
-		FileName: chunk_id,
-		Server:   int64(define.GetServerId(hashRing.Hash.Get(chunk_id))),
-	})
+
+	serverAddr := StorageGroup.Server.Peers.Get(chunk_id)
+	log.Printf("upload chunk %s to server %s", chunk_id, serverAddr)
+	success, err := StorageGroup.Server.GrpcGetters[serverAddr].Upload(chunk_id, data)
+	if !success {
+		return err
+	}
 	if err != nil {
 		return err
 	}
 	return nil
+	//client := fileServerClient_gRPC.GetClientById(server_id)
+	//ctx, _ := context.WithTimeout(context.Background(), time.Minute*30)
+	//_, err = client.UploadChunk(ctx, &XcXcPanFileServer.UploadChunkRequest{
+	//	Data:     data,
+	//	FileName: chunk_id,
+	//	Server:   int64(define.GetServerId(hashRing.Hash.Get(chunk_id))),
+	//})
+	//if err != nil {
+	//	return err
+	//}
+	//return nil
 
 }
 

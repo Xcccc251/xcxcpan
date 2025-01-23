@@ -74,7 +74,6 @@ func Router() *gin.Engine {
 		showShare.POST("/createDownloadUrl/:shareId/:fileId", service.CreateShareFileDownloadUrl)
 		showShare.GET("/download/:code", service.Download4ShareFile)
 	}
-	v1.GET("/video/test", service.TestVideo)
 
 	return r
 }

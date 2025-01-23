@@ -36,16 +36,14 @@ func GetSet(key string) []string {
 	return models.RDb.SMembers(context.Background(), key).Val()
 }
 
-func SetHash(key string, field int, value int) {
+func SetHash(key string, field int, value string) {
 	fieldStr := strconv.Itoa(field)
-	valueStr := strconv.Itoa(value)
-	models.RDb.HSet(context.Background(), key, fieldStr, valueStr)
+	models.RDb.HSet(context.Background(), key, fieldStr, value)
 }
-
-func GetHashInt(key string) map[int]int {
+func GetChunkMap(key string) map[int]string {
 	hash, _ := models.RDb.HGetAll(context.Background(), key).Result()
 	// 转换为 map[int]int
-	intMap := make(map[int]int)
+	hashMap := make(map[int]string)
 	for k, v := range hash {
 		// 将 key 转换为 int
 		intKey, err := strconv.Atoi(k)
@@ -53,14 +51,7 @@ func GetHashInt(key string) map[int]int {
 			continue
 		}
 
-		// 将 value 转换为 int
-		intValue, err := strconv.Atoi(v)
-		if err != nil {
-			continue
-		}
-
-		// 存入 map[int]int
-		intMap[intKey] = intValue
+		hashMap[intKey] = v
 	}
-	return intMap
+	return hashMap
 }
